@@ -16,17 +16,20 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import DropDownPicker from "react-native-dropdown-picker";
 import Modal from "react-native-modal";
 
 const avatarImg = require("../images/avatar.png");
 const femaleImg = require("../images/female.png");
 
 type Patient = {
+  ADM_REQ_ID?: number; // <-- admission-level unique id from backend
   PATIENT_ID: number;
-  PMR_NO: number;
+  PMR_NO: number | string;
   PATIENT_FNAME: string;
   PATIENT_LNAME?: string;
   GENDER: string;
+  WARD_ID?: number;
 };
 
 type Note = {
@@ -62,6 +65,13 @@ type Radiology = {
   short_history: string;
 };
 
+// Ward mapping (keeps mapping consistent with backend)
+const wardMap: Record<number, string> = {
+  921: "PICU",
+  1116: "NICU",
+  1119: "GP",
+};
+
 export default function PatientsScreen() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(false);
@@ -80,12 +90,29 @@ export default function PatientsScreen() {
 
   const { width } = useWindowDimensions();
 
-  const LOCAL_IP = "192.168.100.102";
+  const LOCAL_IP = "192.168.100.69";
   const API_BASE =
     Platform.OS === "android" ? "http://10.0.2.2:3000" : `http://${LOCAL_IP}:3000`;
 
   // ---------------------------
-  // Fetch patients with pagination & search
+  // Filters (UI only) - defaults: Korangi + PICU
+  // ---------------------------
+  const [branch, setBranch] = useState("Korangi");
+  const [ward, setWard] = useState("PICU");
+
+  const [branchOpen, setBranchOpen] = useState(false);
+  const [wardOpen, setWardOpen] = useState(false);
+
+  // keep items in state so DropDownPicker typings are happy
+  const [branchItemsState, setBranchItemsState] = useState([{ label: "Korangi", value: "Korangi" }]);
+  const [wardItemsState, setWardItemsState] = useState([
+    { label: "PICU", value: "PICU" },
+    { label: "NICU", value: "NICU" },
+    { label: "GP", value: "GP" },
+  ]);
+
+  // ---------------------------
+  // Fetch patients with pagination & dedupe appended pages
   // ---------------------------
   const fetchPatients = useCallback(
     async (pageNum: number = 1, query: string = "") => {
@@ -95,8 +122,26 @@ export default function PatientsScreen() {
           params: { page: pageNum, limit: 20, search: query },
         });
         const data: Patient[] = res.data || [];
-        if (pageNum === 1) setPatients(data);
-        else setPatients((prev) => [...prev, ...data]);
+
+        if (pageNum === 1) {
+          setPatients(data);
+        } else {
+          // Append but deduplicate by ADM_REQ_ID (preferred) or PATIENT_ID
+          setPatients((prev) => {
+            const map = new Map<string | number, Patient>();
+            // insert existing first
+            for (const p of prev) {
+              const key = p.ADM_REQ_ID ?? p.PATIENT_ID;
+              map.set(key, p);
+            }
+            // then insert incoming (will replace duplicates with new one)
+            for (const p of data) {
+              const key = p.ADM_REQ_ID ?? p.PATIENT_ID;
+              map.set(key, p);
+            }
+            return Array.from(map.values());
+          });
+        }
       } catch (err) {
         console.error("Error fetching patients:", err);
       } finally {
@@ -124,6 +169,15 @@ export default function PatientsScreen() {
       fetchPatients(nextPage, searchQuery);
     }
   };
+
+  // ---------------------------
+  // Apply filter (client-side) — DO NOT change modal/UI behavior
+  // ---------------------------
+  const filteredPatients = patients.filter((p) => {
+    const wardName = p.WARD_ID ? wardMap[p.WARD_ID] : null;
+    // branch is hardcoded Korangi for now; ward filters by mapped name
+    return branch === "Korangi" && (!ward || wardName === ward);
+  });
 
   // ---------------------------
   // Open modal
@@ -161,7 +215,7 @@ export default function PatientsScreen() {
   };
 
   // ---------------------------
-  // Render patient
+  // Render patient (unchanged UI)
   // ---------------------------
   const renderPatient = ({ item }: { item: Patient }) => (
     <View style={styles.card}>
@@ -197,7 +251,7 @@ export default function PatientsScreen() {
   );
 
   // ---------------------------
-  // Modal content
+  // Modal content — EXACTLY as in your original UI (no changes)
   // ---------------------------
   const renderModalContent = () => {
     if (!selectedPatient || !modalType) return null;
@@ -297,6 +351,36 @@ export default function PatientsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Dropdown Filters (added on top, UI otherwise unchanged) */}
+      <View style={{ flexDirection: "row", marginHorizontal: 12, marginTop: 8, zIndex: 1000 }}>
+        <View style={{ flex: 1, marginRight: 6 }}>
+          <DropDownPicker
+            open={branchOpen}
+            value={branch}
+            items={branchItemsState}
+            setOpen={setBranchOpen}
+            setValue={setBranch}
+            setItems={setBranchItemsState}
+            placeholder="Select Branch"
+            style={{ borderColor: "#ccc" }}
+            dropDownContainerStyle={{ borderColor: "#ccc" }}
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <DropDownPicker
+            open={wardOpen}
+            value={ward}
+            items={wardItemsState}
+            setOpen={setWardOpen}
+            setValue={setWard}
+            setItems={setWardItemsState}
+            placeholder="Select Ward"
+            style={{ borderColor: "#ccc" }}
+            dropDownContainerStyle={{ borderColor: "#ccc" }}
+          />
+        </View>
+      </View>
+
       <TextInput
         style={styles.searchInput}
         placeholder="Search patient..."
@@ -307,8 +391,8 @@ export default function PatientsScreen() {
         <ActivityIndicator size="large" color="#00A652" style={{ marginTop: 50 }} />
       ) : (
         <FlatList
-          data={patients}
-          keyExtractor={(item) => item.PATIENT_ID.toString()}
+          data={filteredPatients}
+          keyExtractor={(item) => String(item.ADM_REQ_ID ?? item.PATIENT_ID)}
           renderItem={renderPatient}
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}

@@ -54,6 +54,15 @@ export default function AppLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="testtab"
+        options={{
+          title: "test",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

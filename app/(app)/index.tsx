@@ -109,7 +109,7 @@ export default function Dashboard() {
   // ---------- Fetch Korangi Data ----------
   const fetchKorangiData = useCallback(async () => {
     try {
-      const res = await axios.get("http://192.168.100.102:3000/ward_beds");
+      const res = await axios.get("http://192.168.100.69:3000/ward_beds");
       const data: { ward: string; status: number }[] = res.data;
 
       const newKorangi: BranchWards = {
