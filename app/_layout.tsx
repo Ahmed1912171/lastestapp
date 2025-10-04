@@ -1,12 +1,15 @@
 import { Stack } from "expo-router";
 import { SessionProvider, useSession } from "../ctx";
-import { SplashScreenController } from "../splash";
+import { ThemeProvider } from "../ctx/theme"; // ✅ Dark mode context
+import { SplashScreenController } from "../splashController";
 
 export default function Root() {
   return (
     <SessionProvider>
-      <SplashScreenController />
-      <RootNavigator />
+      <ThemeProvider>
+        <SplashScreenController />
+        <RootNavigator />
+      </ThemeProvider>
     </SessionProvider>
   );
 }
@@ -16,21 +19,19 @@ function RootNavigator() {
 
   return (
     <Stack>
-      {/* Authenticated area */}
-      <Stack.Protected guard={!!session}>
-        <Stack.Screen
-          name="(app)"
-          options={{ headerShown: false }} // 🚀 hides "(app)" from top bar
-        />
-      </Stack.Protected>
+      {/* ✅ Authenticated area */}
+      <Stack.Screen
+        name="(app)"
+        options={{ headerShown: false }}
+        redirect={!session} // redirect to login if not logged in
+      />
 
-      {/* Public login */}
-      <Stack.Protected guard={!session}>
-        <Stack.Screen
-          name="sign-in"
-          options={{ headerShown: false }} // 🚀 hides "sign-in" from top bar
-        />
-      </Stack.Protected>
+      {/* ✅ Public login */}
+      <Stack.Screen
+        name="sign-in"
+        options={{ headerShown: false }}
+        redirect={!!session} // redirect to home if already logged in
+      />
     </Stack>
   );
 }

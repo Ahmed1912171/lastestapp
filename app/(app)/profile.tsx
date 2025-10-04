@@ -1,17 +1,17 @@
 import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
-import React, { createContext, useContext, useState } from "react";
-import { StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import React from "react";
+import {
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import SimpleAvatar from "../../components/SimpleAvatar";
-import { useSession } from "../../ctx"; // ✅ Import session
+import { useSession } from "../../ctx";
+import { useTheme } from "../../ctx/theme"; // ✅ global theme hook
 
-// Context for Dark Mode
-export const DarkModeContext = createContext({
-  isDarkMode: false,
-  toggleDarkMode: () => {},
-});
-
-// Example doctor data
 const doctor = {
   name: "Dr. Ahmed",
   id: "DOC12345",
@@ -19,14 +19,8 @@ const doctor = {
 };
 
 export default function Profile() {
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const { toggleDarkMode } = useContext(DarkModeContext) || {};
-  const { signOut } = useSession(); // ✅ get signOut from context
-
-  const handleToggleDarkMode = () => {
-    setIsDarkMode((prev) => !prev);
-    if (toggleDarkMode) toggleDarkMode();
-  };
+  const { isDarkMode, toggleDarkMode } = useTheme();
+  const { signOut } = useSession();
 
   return (
     <SafeAreaView
@@ -63,6 +57,7 @@ export default function Profile() {
               {doctor.id}
             </Text>
           </View>
+
           <View style={styles.infoRow}>
             <MaterialIcons name="email" size={20} color="#6b7280" />
             <Text
@@ -76,7 +71,7 @@ export default function Profile() {
           </View>
         </View>
 
-        {/* Edit Profile */}
+        {/* Edit Profile Button */}
         <TouchableOpacity
           style={[styles.button, { backgroundColor: "#3b82f6" }]}
         >
@@ -94,23 +89,26 @@ export default function Profile() {
               style={{ marginRight: 8 }}
             />
             <Text
-              style={[styles.infoLabel, { color: isDarkMode ? "#fff" : "#000" }]}
+              style={[
+                styles.infoLabel,
+                { color: isDarkMode ? "#fff" : "#000" },
+              ]}
             >
               Dark Mode
             </Text>
           </View>
           <Switch
             value={isDarkMode}
-            onValueChange={handleToggleDarkMode}
+            onValueChange={toggleDarkMode}
             trackColor={{ false: "#d1d5db", true: "#3b82f6" }}
             thumbColor={isDarkMode ? "#fff" : "#f4f3f4"}
           />
         </View>
 
-        {/* ✅ Sign Out */}
+        {/* Sign Out */}
         <TouchableOpacity
           style={[styles.button, { backgroundColor: "#ef4444" }]}
-          onPress={signOut} // useSession signOut
+          onPress={signOut}
         >
           <MaterialIcons name="logout" size={20} color="#fff" />
           <Text style={styles.buttonText}>Sign Out</Text>
@@ -120,6 +118,7 @@ export default function Profile() {
   );
 }
 
+// ✅ ADD THIS PART
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   container: { flex: 1, padding: 20 },

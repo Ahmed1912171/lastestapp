@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,6 +15,8 @@ import {
   GestureHandlerRootView,
   PinchGestureHandler,
 } from "react-native-gesture-handler";
+import { SafeAreaView } from "react-native-safe-area-context";
+
 
 // ✅ Images
 const avatarImg = require("../images/avatar.png");

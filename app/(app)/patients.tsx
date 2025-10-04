@@ -7,7 +7,6 @@ import {
   Image,
   Platform,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,6 +15,9 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+
 import DropDownPicker from "react-native-dropdown-picker";
 import { GestureHandlerRootView, PinchGestureHandler } from "react-native-gesture-handler";
 import Modal from "react-native-modal";
@@ -131,7 +133,7 @@ export default function PatientsScreen() {
         setRefreshing(false);
       }
     },
-    []
+    [API_BASE]
   );
 
   useEffect(() => { fetchPatients(1, searchQuery); }, [fetchPatients, searchQuery]);
@@ -185,7 +187,7 @@ export default function PatientsScreen() {
     return (
       <GestureHandlerRootView>
         <PinchGestureHandler onGestureEvent={(e) => { let s = e.nativeEvent.scale; if (s < 0.8) s = 0.8; if (s > 2) s = 2; setScale(s); }}>
-          <ScrollView horizontal style={{ marginBottom: 20 }}>
+          <ScrollView horizontal style={{ marginBottom: 10 }}>
             <View style={{ minWidth: 800 }}>
               <ScrollView style={{ maxHeight: height - 200 }}>
                 <View style={{ transform: [{ scale }] }}>
