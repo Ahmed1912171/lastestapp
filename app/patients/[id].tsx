@@ -10,7 +10,12 @@ import {
   Text,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
+import {
+  GestureHandlerRootView,
+  PinchGestureHandler,
+} from "react-native-gesture-handler";
 
 // ✅ Images
 const avatarImg = require("../images/avatar.png");
@@ -58,6 +63,14 @@ type Lab = {
   IsPathologist: number;
 };
 
+type PivotedData = {
+  TestID: string;
+  Heading: string;
+  ComponentID: string;
+  NormalRange: string;
+  [date: string]: string;
+};
+
 type Radiology = {
   id: number;
   pmr_no: string;
@@ -74,6 +87,7 @@ type Radiology = {
 
 export default function PatientDetailScreen() {
   const { id } = useLocalSearchParams();
+  const { height } = useWindowDimensions();
 
   const [patient, setPatient] = useState<PatientDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -82,8 +96,9 @@ export default function PatientDetailScreen() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [labReports, setLabReports] = useState<Lab[]>([]);
   const [radiologyReports, setRadiologyReports] = useState<Radiology[]>([]);
+  const [scale, setScale] = useState(1);
 
-  // 🔹 Fetch data
+  // 🔹 Fetch patient data
   useEffect(() => {
     const fetchPatientData = async () => {
       try {
@@ -123,9 +138,44 @@ export default function PatientDetailScreen() {
     );
   }
 
+  // 🔹 Pivot lab data for table
+  const uniqueDates = Array.from(
+    new Set(
+      labReports.map((item) =>
+        item.Result_date_time ? item.Result_date_time.split("T")[0] : ""
+      )
+    )
+  ).filter(Boolean);
+
+  const pivoted: PivotedData[] = [];
+  const map = new Map<string, PivotedData>();
+
+  labReports.forEach((item) => {
+    const key = `${item.TestID}-${item.ComponentID}`;
+    const date = item.Result_date_time ? item.Result_date_time.split("T")[0] : "-";
+
+    if (!map.has(key)) {
+      map.set(key, {
+        TestID: item.TestID,
+        Heading: item.Heading,
+        ComponentID: item.ComponentID,
+        NormalRange: item.NormalRange,
+      });
+    }
+    const row = map.get(key)!;
+    row[date] = item.Result || "-";
+  });
+
+  map.forEach((row) => pivoted.push(row));
+
+  const grouped: { [testID: string]: PivotedData[] } = {};
+  pivoted.forEach((row) => {
+    if (!grouped[row.TestID]) grouped[row.TestID] = [];
+    grouped[row.TestID].push(row);
+  });
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* ✅ Custom Header Title */}
       <Stack.Screen options={{ title: "Patients History" }} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -141,7 +191,7 @@ export default function PatientDetailScreen() {
           <Text style={styles.mr}>Patient ID {patient.PATIENT_ID}</Text>
         </View>
 
-        {/* ✅ Patient Info as Report Table */}
+        {/* Patient Info Table */}
         <View style={styles.reportTable}>
           <View style={styles.reportRow}>
             <Text style={styles.reportLabel}>Patient ID</Text>
@@ -187,6 +237,7 @@ export default function PatientDetailScreen() {
 
         {/* Tab Content */}
         <View style={styles.tabContent}>
+          {/* Notes */}
           {activeTab === "notes" &&
             (notes.length > 0 ? (
               notes.map((note) => (
@@ -198,56 +249,97 @@ export default function PatientDetailScreen() {
               <Text>No notes available.</Text>
             ))}
 
+          {/* Lab Reports */}
           {activeTab === "lab" &&
             (labReports.length > 0 ? (
-              // Group by Barcode_no
-              Object.values(
-                labReports.reduce((acc: any, lab) => {
-                  if (!acc[lab.Barcode_no]) {
-                    acc[lab.Barcode_no] = { ...lab, tests: [] };
-                  }
-                  acc[lab.Barcode_no].tests.push(lab);
-                  return acc;
-                }, {})
-              ).map((group: any, idx) => (
-                <View key={idx} style={styles.labReportCard}>
-                  {/* Report Header */}
-                  <Text style={styles.reportTitle}>{group.Heading || "Report"}</Text>
-                  <Text style={styles.reportSub}>Barcode: {group.Barcode_no}</Text>
-                  <Text style={styles.reportSub}>Lab No: {group.LabNo}</Text>
-                  <Text style={styles.reportSub}>Order ID: {group.Order_Id}</Text>
-                  <Text style={styles.reportSub}>PMR No: {group.PMR_NO}</Text>
-                  <Text style={styles.reportSub}>
-                    Result Date: {group.Result_date_time?.split("T")[0]}
-                  </Text>
+              <GestureHandlerRootView>
+                <PinchGestureHandler
+                  onGestureEvent={(e) => {
+                    let newScale = e.nativeEvent.scale;
+                    if (newScale < 0.8) newScale = 0.8;
+                    if (newScale > 2) newScale = 2;
+                    setScale(newScale);
+                  }}
+                >
+                  <ScrollView horizontal>
+                    <View style={{ minWidth: 800, marginBottom: 20 }}>
+                      <ScrollView style={{ maxHeight: height - 200 }}>
+                        <View style={{ transform: [{ scale }] }}>
+                          {/* Table Header */}
+                          <View style={[styles.row, styles.headerRow]}>
+                            <Text style={[styles.cell, styles.headerCell, { width: 80 }]}>
+                              Test ID
+                            </Text>
+                            <Text style={[styles.cell, styles.headerCell, { width: 110 }]}>
+                              Heading
+                            </Text>
+                            <Text style={[styles.cell, styles.headerCell, { width: 110 }]}>
+                              Component
+                            </Text>
+                            <Text style={[styles.cell, styles.headerCell, { width: 150 }]}>
+                              Normal Range
+                            </Text>
+                            {uniqueDates.map((date) => (
+                              <Text
+                                key={date}
+                                style={[styles.cell, styles.headerCell, { width: 120 }]}
+                              >
+                                {date}
+                              </Text>
+                            ))}
+                          </View>
 
-                  <View style={styles.divider} />
-
-                  {/* ✅ Green Table Header */}
-                  <View style={styles.tableRowHeader}>
-                    <Text style={[styles.tableHeaderCell, { flex: 2 }]}>Test</Text>
-                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Result</Text>
-                    <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Unit</Text>
-                    <Text style={[styles.tableHeaderCell, { flex: 2 }]}>Normal Range</Text>
-                  </View>
-
-                  {/* Table Rows */}
-                  {group.tests.map((test: Lab, i: number) => (
-                    <View key={i} style={styles.tableRowData}>
-                      <Text style={[styles.tableCell, { flex: 2 }]}>{test.ComponentID}</Text>
-                      <Text style={[styles.tableCell, { flex: 1 }]}>{test.Result}</Text>
-                      <Text style={[styles.tableCell, { flex: 1 }]}>{test.Unit}</Text>
-                      <Text style={[styles.tableCell, { flex: 2, color: "#555" }]}>
-                        {test.NormalRange}
-                      </Text>
+                          {/* Table Rows */}
+                          {Object.entries(grouped).map(([testID, rows]) =>
+                            rows.map((row, idx) => (
+                              <View key={`${testID}-${idx}`} style={styles.row}>
+                                {idx === 0 ? (
+                                  <View
+                                    style={[
+                                      styles.cellBox,
+                                      { width: 80, backgroundColor: "#f9f9f9" },
+                                    ]}
+                                  >
+                                    <Text
+                                      style={{
+                                        fontSize: 12,
+                                        fontWeight: "600",
+                                        textAlign: "center",
+                                      }}
+                                    >
+                                      {testID}
+                                    </Text>
+                                  </View>
+                                ) : (
+                                  <View
+                                    style={[styles.cellBox, { width: 80, backgroundColor: "#fff" }]}
+                                  />
+                                )}
+                                <Text style={[styles.cell, { width: 110 }]}>{row.Heading}</Text>
+                                <Text style={[styles.cell, { width: 110 }]}>{row.ComponentID}</Text>
+                                <Text style={[styles.cell, { width: 150 }]}>{row.NormalRange}</Text>
+                                {uniqueDates.map((date) => (
+                                  <Text
+                                    key={`${testID}-${idx}-${date}`}
+                                    style={[styles.cell, { width: 120 }]}
+                                  >
+                                    {row[date] || "-"}
+                                  </Text>
+                                ))}
+                              </View>
+                            ))
+                          )}
+                        </View>
+                      </ScrollView>
                     </View>
-                  ))}
-                </View>
-              ))
+                  </ScrollView>
+                </PinchGestureHandler>
+              </GestureHandlerRootView>
             ) : (
               <Text>No lab reports available.</Text>
             ))}
 
+          {/* Radiology */}
           {activeTab === "radiology" &&
             (radiologyReports.length > 0 ? (
               radiologyReports.map((rad) => (
@@ -301,7 +393,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  // ✅ Patient Info Table
+  // Patient Info Table
   reportTable: {
     backgroundColor: "#fff",
     borderRadius: 10,
@@ -318,73 +410,21 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#e5e7eb",
   },
-  reportLabel: {
-    fontWeight: "600",
-    fontSize: 14,
-    color: "#000000ff",
-    flex: 1,
-  },
-  reportValue: {
-    fontSize: 14,
-    color: "#333",
-    flex: 1,
-    textAlign: "right",
-  },
+  reportLabel: { fontWeight: "600", fontSize: 14, color: "#000", flex: 1 },
+  reportValue: { fontSize: 14, color: "#333", flex: 1, textAlign: "right" },
 
-  // ✅ Lab Report Styling
-  labReportCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  reportTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 4,
-    textAlign: "center",
-    color: "#222",
-  },
-  reportSub: {
-    fontSize: 13,
-    color: "#555",
-    marginBottom: 2,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "#ddd",
-    marginVertical: 10,
-  },
-
-  tableRowHeader: {
-    flexDirection: "row",
-    backgroundColor: "#00A652",
+  // Lab Table
+  row: { flexDirection: "row", borderBottomWidth: 1, borderColor: "#ddd" },
+  headerRow: { backgroundColor: "#00A652", borderBottomWidth: 1 },
+  cell: {
     paddingVertical: 6,
-    paddingHorizontal: 4,
-    borderRadius: 4,
-    marginBottom: 6,
+    paddingHorizontal: 6,
+    fontSize: 12,
+    textAlign: "center",
+    color: "#000",
+    borderRightWidth: 1,
+    borderColor: "#ddd",
   },
-  tableHeaderCell: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#fff",
-    textAlign: "left",
-  },
-
-  tableRowData: {
-    flexDirection: "row",
-    marginBottom: 4,
-    paddingVertical: 4,
-    borderBottomWidth: 1,
-    borderColor: "#eee",
-  },
-  tableCell: {
-    fontSize: 13,
-    color: "#333",
-  },
+  cellBox: { justifyContent: "center", alignItems: "center", borderRightWidth: 1, borderColor: "#ddd" },
+  headerCell: { fontWeight: "bold", fontSize: 12, color: "#fff" },
 });
