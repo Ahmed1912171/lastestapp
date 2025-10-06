@@ -33,7 +33,7 @@ export default function LoginScreen() {
 
   const API_URL =
     Platform.OS === "android"
-      ? "http://10.0.2.2:3000/"
+      ? "http://10.0.2.2:3000/admin"
       : `http://${LOCAL_IP}:3000/admin`;
 
   // ✅ Preload background image before rendering
