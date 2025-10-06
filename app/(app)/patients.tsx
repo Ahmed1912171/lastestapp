@@ -15,12 +15,10 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-
-
 import DropDownPicker from "react-native-dropdown-picker";
 import { GestureHandlerRootView, PinchGestureHandler } from "react-native-gesture-handler";
 import Modal from "react-native-modal";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const avatarImg = require("../images/avatar.png");
 const femaleImg = require("../images/female.png");
@@ -71,7 +69,7 @@ type PivotedData = {
   Heading: string;
   ComponentID: string;
   NormalRange: string;
-  [date: string]: string; // results keyed by date
+  [date: string]: string;
 };
 
 const wardMap: Record<number, string> = {
@@ -86,22 +84,20 @@ export default function PatientsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
-
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [modalType, setModalType] = useState<"notes" | "lab" | "radiology" | null>(null);
   const [activeTab, setActiveTab] = useState<"notes" | "lab" | "radiology">("notes");
-
   const [notes, setNotes] = useState<Note[]>([]);
   const [labReports, setLabReports] = useState<LabResult[]>([]);
   const [radiologyReports, setRadiologyReports] = useState<Radiology[]>([]);
   const [modalLoading, setModalLoading] = useState(false);
   const [scale, setScale] = useState(1);
 
-  const { height } = useWindowDimensions();
-  const LOCAL_IP = "192.168.100.69";
+  useWindowDimensions();
+  const LOCAL_IP = "192.168.100.146";
   const API_BASE = Platform.OS === "android" ? "http://10.0.2.2:3000" : `http://${LOCAL_IP}:3000`;
 
-  // Filters
+  // filters
   const [branch, setBranch] = useState("Korangi");
   const [ward, setWard] = useState("PICU");
   const [branchOpen, setBranchOpen] = useState(false);
@@ -117,7 +113,9 @@ export default function PatientsScreen() {
     async (pageNum: number = 1, query: string = "") => {
       try {
         if (pageNum === 1) setLoading(true);
-        const res = await axios.get(`${API_BASE}/patients_all`, { params: { page: pageNum, limit: 20, search: query } });
+        const res = await axios.get(`${API_BASE}/patients_all`, {
+          params: { page: pageNum, limit: 20, search: query },
+        });
         const data: Patient[] = res.data || [];
         if (pageNum === 1) setPatients(data);
         else setPatients((prev) => {
@@ -136,79 +134,113 @@ export default function PatientsScreen() {
     [API_BASE]
   );
 
-  useEffect(() => { fetchPatients(1, searchQuery); }, [fetchPatients, searchQuery]);
-  const onRefresh = () => { setRefreshing(true); setPage(1); fetchPatients(1, searchQuery); };
-  const loadMore = () => { if (!loading) { const nextPage = page + 1; setPage(nextPage); fetchPatients(nextPage, searchQuery); } };
-  const filteredPatients = patients.filter((p) => { const wardName = p.WARD_ID ? wardMap[p.WARD_ID] : null; return branch === "Korangi" && (!ward || wardName === ward); });
+  useEffect(() => {
+    fetchPatients(1, searchQuery);
+  }, [fetchPatients, searchQuery]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    setPage(1);
+    fetchPatients(1, searchQuery);
+  };
+
+  const loadMore = () => {
+    if (!loading) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      fetchPatients(nextPage, searchQuery);
+    }
+  };
+
+  const filteredPatients = patients.filter((p) => {
+    const wardName = p.WARD_ID ? wardMap[p.WARD_ID] : null;
+    return branch === "Korangi" && (!ward || wardName === ward);
+  });
 
   const openModal = async (patient: Patient, type: "notes" | "lab" | "radiology") => {
-    setSelectedPatient(patient); setModalType(type); setActiveTab(type); setModalLoading(true);
+    setSelectedPatient(patient);
+    setModalType(type);
+    setActiveTab(type);
+    setModalLoading(true);
     try {
-      if (type === "notes") setNotes((await axios.get(`${API_BASE}/patients/${patient.PATIENT_ID}/notes`)).data);
-      if (type === "lab") setLabReports((await axios.get(`${API_BASE}/patients/${patient.PATIENT_ID}/lab`)).data);
-      if (type === "radiology") setRadiologyReports((await axios.get(`${API_BASE}/patients/${patient.PATIENT_ID}/radiology`)).data);
-    } catch (err) { console.error(err); } finally { setModalLoading(false); setScale(1); }
+      if (type === "notes")
+        setNotes((await axios.get(`${API_BASE}/patients/${patient.PATIENT_ID}/notes`)).data);
+      if (type === "lab")
+        setLabReports((await axios.get(`${API_BASE}/patients/${patient.PATIENT_ID}/lab`)).data);
+      if (type === "radiology")
+        setRadiologyReports((await axios.get(`${API_BASE}/patients/${patient.PATIENT_ID}/radiology`)).data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setModalLoading(false);
+      setScale(1);
+    }
   };
-  const closeModal = () => { setSelectedPatient(null); setModalType(null); setNotes([]); setLabReports([]); setRadiologyReports([]); };
 
-  const renderPatient = ({ item }: { item: Patient }) => (
-    <View style={styles.card}>
-      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
-        <Image source={item.GENDER === "Female" ? femaleImg : avatarImg} style={{ width: 40, height: 40, borderRadius: 20 }} />
-        <View style={{ marginLeft: 8 }}>
-          <Text style={{ fontWeight: "600" }}>{item.PATIENT_FNAME} {item.PATIENT_LNAME || ""}</Text>
-          <Text style={{ fontSize: 12, color: "#666" }}>MR: {item.PMR_NO}</Text>
-          <Text style={{ fontSize: 12, color: "#666" }}>ID: {item.PATIENT_ID}</Text>
-        </View>
-      </View>
-      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        <TouchableOpacity onPress={() => openModal(item, "notes")} style={styles.button}><Eye size={16} color="#fff" /><Text style={styles.buttonText}>Notes</Text></TouchableOpacity>
-        <TouchableOpacity onPress={() => openModal(item, "lab")} style={styles.button}><FileText size={16} color="#fff" /><Text style={styles.buttonText}>Lab Reports</Text></TouchableOpacity>
-        <TouchableOpacity onPress={() => openModal(item, "radiology")} style={styles.button}><FileText size={16} color="#fff" /><Text style={styles.buttonText}>Radiology</Text></TouchableOpacity>
-      </View>
-    </View>
-  );
+  const closeModal = () => {
+    setSelectedPatient(null);
+    setModalType(null);
+    setNotes([]);
+    setLabReports([]);
+    setRadiologyReports([]);
+  };
 
+  // ----- LAB TAB: horizontal scroll only (no inner vertical ScrollView) -----
   const renderLabTab = () => {
     if (!labReports.length) return <Text>No lab reports available.</Text>;
-    const uniqueDates = Array.from(new Set(labReports.map((item) => item.Result_date_time?.split("T")[0]).filter(Boolean)));
+
+    const uniqueDates = Array.from(new Set(labReports.map((i) => i.Result_date_time?.split("T")[0]).filter(Boolean)));
     const pivoted: PivotedData[] = [];
     const mapPivot = new Map<string, PivotedData>();
     labReports.forEach((item) => {
       const key = `${item.TestID}-${item.ComponentID}`;
       const date = item.Result_date_time?.split("T")[0] || "-";
-      if (!mapPivot.has(key)) mapPivot.set(key, { TestID: item.TestID, Heading: item.Heading, ComponentID: item.ComponentID, NormalRange: item.NormalRange });
+      if (!mapPivot.has(key))
+        mapPivot.set(key, { TestID: item.TestID, Heading: item.Heading, ComponentID: item.ComponentID, NormalRange: item.NormalRange });
       mapPivot.get(key)![date] = item.Result || "-";
     });
     mapPivot.forEach((row) => pivoted.push(row));
     const grouped: { [testID: string]: PivotedData[] } = {};
-    pivoted.forEach((row) => { if (!grouped[row.TestID]) grouped[row.TestID] = []; grouped[row.TestID].push(row); });
+    pivoted.forEach((r) => { if (!grouped[r.TestID]) grouped[r.TestID] = []; grouped[r.TestID].push(r); });
+
+    // dynamic table width so columns fit
+    const minWidth = Math.max(800, 450 + uniqueDates.length * 120);
 
     return (
       <GestureHandlerRootView>
-        <PinchGestureHandler onGestureEvent={(e) => { let s = e.nativeEvent.scale; if (s < 0.8) s = 0.8; if (s > 2) s = 2; setScale(s); }}>
-          <ScrollView horizontal style={{ marginBottom: 10 }}>
-            <View style={{ minWidth: 800 }}>
-              <ScrollView style={{ maxHeight: height - 200 }}>
-                <View style={{ transform: [{ scale }] }}>
-                  <View style={[styles.row, styles.headerRow]}>
-                    <Text style={[styles.cell, styles.headerCell, { width: 80 }]}>Test ID</Text>
-                    <Text style={[styles.cell, styles.headerCell, { width: 110 }]}>Heading</Text>
-                    <Text style={[styles.cell, styles.headerCell, { width: 110 }]}>Component</Text>
-                    <Text style={[styles.cell, styles.headerCell, { width: 150 }]}>Normal Range</Text>
-                    {uniqueDates.map((date) => <Text key={date} style={[styles.cell, styles.headerCell, { width: 120 }]}>{date}</Text>)}
-                  </View>
-                  {Object.entries(grouped).map(([testID, rows]) => rows.map((row, idx) => (
+        <PinchGestureHandler onGestureEvent={(e) => {
+          let s = e.nativeEvent.scale;
+          if (s < 0.8) s = 0.8;
+          if (s > 2) s = 2;
+          setScale(s);
+        }}>
+          {/* Horizontal scroll for wide table; vertical scrolling is handled by modal-level ScrollView */}
+          <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator contentContainerStyle={{ paddingBottom: 8 }}>
+            <View style={{ minWidth }}>
+              <View style={{ transform: [{ scale }], paddingBottom: 8 }}>
+                <View style={[styles.row, styles.headerRow]}>
+                  <Text style={[styles.cell, styles.headerCell, { width: 80 }]}>Test ID</Text>
+                  <Text style={[styles.cell, styles.headerCell, { width: 110 }]}>Heading</Text>
+                  <Text style={[styles.cell, styles.headerCell, { width: 110 }]}>Component</Text>
+                  <Text style={[styles.cell, styles.headerCell, { width: 150 }]}>Normal Range</Text>
+                  {uniqueDates.map(date => <Text key={date} style={[styles.cell, styles.headerCell, { width: 120 }]}>{date}</Text>)}
+                </View>
+
+                {Object.entries(grouped).map(([testID, rows]) =>
+                  rows.map((row, idx) => (
                     <View key={`${testID}-${idx}`} style={styles.row}>
-                      {idx === 0 ? <View style={[styles.cellBox, { width: 80, backgroundColor: "#f9f9f9" }]}><Text style={{ fontSize: 12, fontWeight: "600", textAlign: "center" }}>{testID}</Text></View> : <View style={[styles.cellBox, { width: 80 }]} />}
+                      {idx === 0
+                        ? <View style={[styles.cellBox, { width: 80, backgroundColor: "#f9f9f9" }]}><Text style={{ fontSize: 12, fontWeight: "600", textAlign: "center" }}>{testID}</Text></View>
+                        : <View style={[styles.cellBox, { width: 80 }]} />
+                      }
                       <Text style={[styles.cell, { width: 110 }]}>{row.Heading}</Text>
                       <Text style={[styles.cell, { width: 110 }]}>{row.ComponentID}</Text>
                       <Text style={[styles.cell, { width: 150 }]}>{row.NormalRange}</Text>
-                      {uniqueDates.map((date) => <Text key={`${testID}-${idx}-${date}`} style={[styles.cell, { width: 120 }]}>{row[date] || "-"}</Text>)}
+                      {uniqueDates.map(date => <Text key={`${testID}-${idx}-${date}`} style={[styles.cell, { width: 120 }]}>{row[date] || "-"}</Text>)}
                     </View>
-                  )))}
-                </View>
-              </ScrollView>
+                  ))
+                )}
+              </View>
             </View>
           </ScrollView>
         </PinchGestureHandler>
@@ -216,30 +248,34 @@ export default function PatientsScreen() {
     );
   };
 
+  // ----- Modal content: return a plain View (no vertical ScrollView here) -----
   const renderModalContent = () => {
     if (!selectedPatient || !modalType) return null;
     if (modalLoading) return <ActivityIndicator size="large" color="#00A652" style={{ marginTop: 20 }} />;
+
     return (
-      <ScrollView style={{ maxHeight: "90%" }}>
+      <View>
         <View style={{ alignItems: "center", marginBottom: 12 }}>
           <Image source={selectedPatient.GENDER === "Female" ? femaleImg : avatarImg} style={{ width: 80, height: 80, borderRadius: 40 }} />
           <Text style={{ fontWeight: "700", fontSize: 18, marginTop: 6 }}>{selectedPatient.PATIENT_FNAME} {selectedPatient.PATIENT_LNAME || ""}</Text>
           <Text style={{ color: "#666" }}>MR: {selectedPatient.PMR_NO}</Text>
           <Text style={{ color: "#666" }}>ID: {selectedPatient.PATIENT_ID}</Text>
         </View>
+
         <View style={styles.tabRow}>
-          {["notes", "lab", "radiology"].map((tab) => (
+          {["notes", "lab", "radiology"].map(tab => (
             <TouchableOpacity key={tab} style={[styles.tabButton, activeTab === tab && styles.tabActive]} onPress={() => setActiveTab(tab as any)}>
               <Text style={[styles.tabText, activeTab === tab && { color: "#fff", fontWeight: "700" }]}>{tab === "notes" ? "Notes" : tab === "lab" ? "Lab Reports" : "Radiology"}</Text>
             </TouchableOpacity>
           ))}
         </View>
+
         <View style={{ marginTop: 12 }}>
-          {activeTab === "notes" && (notes.length ? notes.map((note) => <View key={note.Loc_ID} style={styles.card}><Text style={{ fontWeight: "600" }}>Date: {note.loc_ex_date?.split("T")[0]}</Text><Text>{note.LocalExamination}</Text></View>) : <Text>No notes available.</Text>)}
+          {activeTab === "notes" && (notes.length ? notes.map(note => <View key={note.Loc_ID} style={styles.card}><Text style={{ fontWeight: "600" }}>Date: {note.loc_ex_date?.split("T")[0]}</Text><Text>{note.LocalExamination}</Text></View>) : <Text>No notes available.</Text>)}
           {activeTab === "lab" && renderLabTab()}
-          {activeTab === "radiology" && (radiologyReports.length ? radiologyReports.map((rad) => <View key={rad.id} style={styles.card}><Text>PMR No: {rad.pmr_no}</Text><Text>Status: {rad.status}</Text><Text>X-Ray: {rad.xray_status}</Text><Text>CT: {rad.ct_status}</Text><Text>Priority: {rad.priority}</Text><Text>Modality: {rad.modality}</Text><Text>Region: {rad.mod_region}</Text><Text>Request Time: {rad.request_time}</Text><Text>History: {rad.short_history}</Text></View>) : <Text>No radiology reports available.</Text>)}
+          {activeTab === "radiology" && (radiologyReports.length ? radiologyReports.map(rad => <View key={rad.id} style={styles.card}><Text>PMR No: {rad.pmr_no}</Text><Text>Status: {rad.status}</Text><Text>X-Ray: {rad.xray_status}</Text><Text>CT: {rad.ct_status}</Text><Text>Priority: {rad.priority}</Text><Text>Modality: {rad.modality}</Text><Text>Region: {rad.mod_region}</Text><Text>Request Time: {rad.request_time}</Text><Text>History: {rad.short_history}</Text></View>) : <Text>No radiology reports available.</Text>)}
         </View>
-      </ScrollView>
+      </View>
     );
   };
 
@@ -255,10 +291,48 @@ export default function PatientsScreen() {
       </View>
 
       <TextInput style={styles.searchInput} placeholder="Search patient..." value={searchQuery} onChangeText={setSearchQuery} />
-      {loading && page === 1 ? <ActivityIndicator size="large" color="#00A652" style={{ marginTop: 50 }} /> : <FlatList data={filteredPatients} keyExtractor={(item) => String(item.ADM_REQ_ID ?? item.PATIENT_ID)} renderItem={renderPatient} onEndReached={loadMore} onEndReachedThreshold={0.5} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />} />}
 
+      {loading && page === 1 ? <ActivityIndicator size="large" color="#00A652" style={{ marginTop: 50 }} /> : (
+        <FlatList
+          data={filteredPatients}
+          keyExtractor={(item) => String(item.ADM_REQ_ID ?? item.PATIENT_ID)}
+          renderItem={({ item }) => (
+            <View style={styles.card}>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+                <Image source={item.GENDER === "Female" ? femaleImg : avatarImg} style={{ width: 40, height: 40, borderRadius: 20 }} />
+                <View style={{ marginLeft: 8 }}>
+                  <Text style={{ fontWeight: "600" }}>{item.PATIENT_FNAME} {item.PATIENT_LNAME || ""}</Text>
+                  <Text style={{ fontSize: 12, color: "#666" }}>MR: {item.PMR_NO}</Text>
+                  <Text style={{ fontSize: 12, color: "#666" }}>ID: {item.PATIENT_ID}</Text>
+                </View>
+              </View>
+
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <TouchableOpacity onPress={() => openModal(item, "notes")} style={styles.button}><Eye size={16} color="#fff" /><Text style={styles.buttonText}>Notes</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => openModal(item, "lab")} style={styles.button}><FileText size={16} color="#fff" /><Text style={styles.buttonText}>Lab Reports</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => openModal(item, "radiology")} style={styles.button}><FileText size={16} color="#fff" /><Text style={styles.buttonText}>Radiology</Text></TouchableOpacity>
+              </View>
+            </View>
+          )}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        />
+      )}
+
+      {/* Modal: single vertical ScrollView controls vertical scrolling to the end */}
       <Modal isVisible={!!selectedPatient} onBackdropPress={closeModal} onBackButtonPress={closeModal} style={{ justifyContent: "center", margin: 16 }}>
-        <View style={{ backgroundColor: "#fff", borderRadius: 12, padding: 16, maxHeight: "90%" }}>{renderModalContent()}</View>
+        <View style={{ backgroundColor: "#fff", borderRadius: 12, padding: 16, maxHeight: "90%" }}>
+          <ScrollView
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator
+            contentContainerStyle={{ paddingBottom: 220 }} // <-- large bottom padding so last rows can scroll fully into view
+            style={{ maxHeight: "100%" }}
+          >
+            {renderModalContent()}
+          </ScrollView>
+        </View>
       </Modal>
     </SafeAreaView>
   );

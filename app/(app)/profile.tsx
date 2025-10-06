@@ -2,10 +2,9 @@ import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import React from "react";
 import {
   StyleSheet,
-  Switch,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import SimpleAvatar from "../../components/SimpleAvatar";
@@ -78,32 +77,6 @@ export default function Profile() {
           <Ionicons name="create-outline" size={20} color="#fff" />
           <Text style={styles.buttonText}>Edit Profile</Text>
         </TouchableOpacity>
-
-        {/* Dark Mode Toggle */}
-        <View style={styles.darkModeRow}>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Ionicons
-              name={isDarkMode ? "moon" : "sunny"}
-              size={20}
-              color={isDarkMode ? "#facc15" : "#f97316"}
-              style={{ marginRight: 8 }}
-            />
-            <Text
-              style={[
-                styles.infoLabel,
-                { color: isDarkMode ? "#fff" : "#000" },
-              ]}
-            >
-              Dark Mode
-            </Text>
-          </View>
-          <Switch
-            value={isDarkMode}
-            onValueChange={toggleDarkMode}
-            trackColor={{ false: "#d1d5db", true: "#3b82f6" }}
-            thumbColor={isDarkMode ? "#fff" : "#f4f3f4"}
-          />
-        </View>
 
         {/* Sign Out */}
         <TouchableOpacity

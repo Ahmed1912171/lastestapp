@@ -3,12 +3,13 @@ import axios from "axios";
 import { Activity, Bed, TestTubes, TrendingUp, Users } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
-  View,
+  View
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -41,37 +42,37 @@ const branchData: BranchData = {
   Korangi: {
     PICU: { chartData: [], stats: { occupied: 0, total: 0, currentPatients: 0, totalTreated: 0 } },
     NICU: { chartData: [], stats: { occupied: 0, total: 0, currentPatients: 0, totalTreated: 0 } },
-    GP:   { chartData: [], stats: { occupied: 0, total: 0, currentPatients: 0, totalTreated: 0 } },
+    GP: { chartData: [], stats: { occupied: 0, total: 0, currentPatients: 0, totalTreated: 0 } },
   },
   Azambasti: {
     PICU: { chartData: [], stats: { occupied: 25, total: 35, currentPatients: 22, totalTreated: 140 } },
     NICU: { chartData: [], stats: { occupied: 18, total: 28, currentPatients: 15, totalTreated: 95 } },
-    GP:   { chartData: [], stats: { occupied: 40, total: 60, currentPatients: 35, totalTreated: 250 } },
+    GP: { chartData: [], stats: { occupied: 40, total: 60, currentPatients: 35, totalTreated: 250 } },
   },
   Sobhraj: {
     PICU: { chartData: [], stats: { occupied: 10, total: 20, currentPatients: 9, totalTreated: 80 } },
     NICU: { chartData: [], stats: { occupied: 12, total: 22, currentPatients: 10, totalTreated: 70 } },
-    GP:   { chartData: [], stats: { occupied: 30, total: 50, currentPatients: 28, totalTreated: 200 } },
+    GP: { chartData: [], stats: { occupied: 30, total: 50, currentPatients: 28, totalTreated: 200 } },
   },
   Sukkur: {
     PICU: { chartData: [], stats: { occupied: 5, total: 15, currentPatients: 4, totalTreated: 40 } },
     NICU: { chartData: [], stats: { occupied: 7, total: 17, currentPatients: 6, totalTreated: 45 } },
-    GP:   { chartData: [], stats: { occupied: 20, total: 40, currentPatients: 18, totalTreated: 150 } },
+    GP: { chartData: [], stats: { occupied: 20, total: 40, currentPatients: 18, totalTreated: 150 } },
   },
   Larkana: {
     PICU: { chartData: [], stats: { occupied: 8, total: 18, currentPatients: 7, totalTreated: 50 } },
     NICU: { chartData: [], stats: { occupied: 6, total: 16, currentPatients: 5, totalTreated: 45 } },
-    GP:   { chartData: [], stats: { occupied: 25, total: 45, currentPatients: 22, totalTreated: 170 } },
+    GP: { chartData: [], stats: { occupied: 25, total: 45, currentPatients: 22, totalTreated: 170 } },
   },
   Hyderabad: {
     PICU: { chartData: [], stats: { occupied: 12, total: 22, currentPatients: 11, totalTreated: 75 } },
     NICU: { chartData: [], stats: { occupied: 9, total: 19, currentPatients: 8, totalTreated: 60 } },
-    GP:   { chartData: [], stats: { occupied: 35, total: 55, currentPatients: 32, totalTreated: 220 } },
+    GP: { chartData: [], stats: { occupied: 35, total: 55, currentPatients: 32, totalTreated: 220 } },
   },
   Nawabshah: {
     PICU: { chartData: [], stats: { occupied: 14, total: 24, currentPatients: 12, totalTreated: 85 } },
     NICU: { chartData: [], stats: { occupied: 11, total: 21, currentPatients: 9, totalTreated: 70 } },
-    GP:   { chartData: [], stats: { occupied: 28, total: 48, currentPatients: 25, totalTreated: 190 } },
+    GP: { chartData: [], stats: { occupied: 28, total: 48, currentPatients: 25, totalTreated: 190 } },
   },
 };
 
@@ -99,6 +100,13 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [today, setToday] = useState("");
 
+  // ---------- New state for Total Tests ----------
+  const [testCount, setTestCount] = useState<number | null>(null);
+  const [loadingCount, setLoadingCount] = useState<boolean>(false);
+
+  // ---------- Local IP fallback (change to your dev machine IP if different) ----------
+  const LOCAL_IP = "192.168.100.146"; // <-- update if your dev machine IP differs
+
   // ---------- Dynamic Date ----------
   useEffect(() => {
     const date = new Date();
@@ -106,16 +114,83 @@ export default function Dashboard() {
     setToday(date.toLocaleDateString("en-US", options));
   }, []);
 
+  // ---------- Fetch Total Tests Count with robust fallback ----------
+  const fetchTestCount = useCallback(async () => {
+    setLoadingCount(true);
+    try {
+      // Try multiple endpoints to work across emulator/simulator/device
+      const candidates = [
+        // android emulator
+        "http://10.0.2.2:3000/tr_newris_request/count",
+        // iOS simulator (localhost)
+        "http://localhost:3000/tr_newris_request/count",
+        // LAN IP (your machine)
+        `http://${LOCAL_IP}:3000/tr_newris_request/count`,
+      ];
+
+      let resultCount: number | null = null;
+      for (const url of candidates) {
+        try {
+          const res = await axios.get(url, { timeout: 4000 });
+          if (res && res.status === 200) {
+            // API might return { count: number } or just a number
+            const data = res.data;
+            if (data == null) {
+              // skip if empty
+              continue;
+            }
+            if (typeof data === "number") {
+              resultCount = data;
+              break;
+            }
+            if (typeof data.count === "number") {
+              resultCount = data.count;
+              break;
+            }
+            // If API returns object with other structure, try to find numeric field
+            const numericField = Object.values(data).find(v => typeof v === "number");
+            if (typeof numericField === "number") {
+              resultCount = numericField;
+              break;
+            }
+          }
+        } catch (err) {
+          // try next candidate silently
+          // console.warn("count fetch failed for", url, err);
+        }
+      }
+
+      if (resultCount === null) {
+        // final attempt using the LAN ip without path troubleshooting
+        try {
+          const res = await axios.get(`http://${LOCAL_IP}:3000/tr_newris_request/count`);
+          const data = res.data;
+          if (typeof data === "number") resultCount = data;
+          else if (typeof data.count === "number") resultCount = data.count;
+        } catch (err) {
+          // nothing
+        }
+      }
+
+      setTestCount(resultCount ?? 0);
+    } catch (err) {
+      console.error("Error fetching test count:", err);
+      setTestCount(0);
+    } finally {
+      setLoadingCount(false);
+    }
+  }, [LOCAL_IP]);
+
   // ---------- Fetch Korangi Data ----------
   const fetchKorangiData = useCallback(async () => {
     try {
-      const res = await axios.get("http://192.168.100.69:3000/ward_beds");
+      const res = await axios.get(`http://${LOCAL_IP}:3000/ward_beds`);
       const data: { ward: string; status: number }[] = res.data;
 
       const newKorangi: BranchWards = {
         PICU: { chartData: branchData.Korangi.PICU.chartData, stats: { occupied: 0, total: 0, currentPatients: 0, totalTreated: branchData.Korangi.PICU.stats.totalTreated } },
         NICU: { chartData: branchData.Korangi.NICU.chartData, stats: { occupied: 0, total: 0, currentPatients: 0, totalTreated: branchData.Korangi.NICU.stats.totalTreated } },
-        GP:   { chartData: branchData.Korangi.GP.chartData, stats: { occupied: 0, total: 0, currentPatients: 0, totalTreated: branchData.Korangi.GP.stats.totalTreated } },
+        GP: { chartData: branchData.Korangi.GP.chartData, stats: { occupied: 0, total: 0, currentPatients: 0, totalTreated: branchData.Korangi.GP.stats.totalTreated } },
       };
 
       data.forEach(bed => {
@@ -131,7 +206,6 @@ export default function Dashboard() {
         }
       });
 
-      // Set currentPatients = occupied and update totalTreated
       (["PICU", "NICU", "GP"] as (keyof BranchWards)[]).forEach(w => {
         newKorangi[w].stats.currentPatients = newKorangi[w].stats.occupied;
         newKorangi[w].stats.totalTreated += newKorangi[w].stats.currentPatients;
@@ -141,13 +215,14 @@ export default function Dashboard() {
     } catch (err) {
       console.error("Error fetching ward beds", err);
     }
-  }, []);
+  }, [LOCAL_IP]);
 
   // ---------- Refresh ----------
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchKorangiData().finally(() => setRefreshing(false));
-  }, [fetchKorangiData]);
+    Promise.all([fetchKorangiData(), fetchTestCount()])
+      .finally(() => setRefreshing(false));
+  }, [fetchKorangiData, fetchTestCount]);
 
   // ---------- Update Wards Dropdown ----------
   useEffect(() => {
@@ -159,8 +234,10 @@ export default function Dashboard() {
   }, [selectedBranch, selectedWard]);
 
   useEffect(() => {
+    // initial load
     fetchKorangiData();
-  }, [fetchKorangiData]);
+    fetchTestCount();
+  }, [fetchKorangiData, fetchTestCount]);
 
   const wardData = branchData[selectedBranch][selectedWard];
 
@@ -215,7 +292,7 @@ export default function Dashboard() {
               setOpen={setWardOpen}
               value={selectedWard}
               setValue={setWardValue}
-              items={wards as any} // TS safe cast
+              items={wards as any}
               listMode="SCROLLVIEW"
               dropDownDirection="AUTO"
               zIndex={5000}
@@ -294,12 +371,17 @@ export default function Dashboard() {
               </View>
             </View>
           </View>
-           <View style={styles.statCard}>
+
+          <View style={styles.statCard}>
             <View style={styles.statRow}>
               <View style={[styles.iconWrapper, { backgroundColor: '#cecbdbff' }]}><TestTubes size={20} color="#1b6115ff" /></View>
               <View>
                 <Text style={styles.statLabel}>Total Tests</Text>
-                <Text style={styles.statValue}>120330</Text>
+                {loadingCount ? (
+                  <ActivityIndicator color="#1b6115ff" size="small" />
+                ) : (
+                  <Text style={styles.statValue}>{testCount !== null ? testCount : "N/A"}</Text>
+                )}
               </View>
             </View>
           </View>
@@ -313,24 +395,19 @@ export default function Dashboard() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#f3f4f6' },
   container: { flex: 1, padding: 16 },
-
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   hello: { fontSize: 24, fontWeight: '700' },
   date: { color: '#666' },
-
   filters: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
   dropdownContainer: { flex: 1, marginRight: 8 },
   dropdownLabel: { marginBottom: 4, fontWeight: '600' },
-
   card: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 16, overflow: 'hidden' },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   cardTitle: { marginLeft: 4, fontSize: 16, fontWeight: '600' },
-
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginVertical: 16 },
   statCard: { width: '48%', backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 12 },
   statRow: { flexDirection: 'row', alignItems: 'center' },
   iconWrapper: { padding: 8, backgroundColor: '#f0fdf4', borderRadius: 8, marginRight: 8 },
-
   statLabel: { fontSize: 12, color: '#666' },
   statValue: { fontSize: 14, fontWeight: '600' },
 });

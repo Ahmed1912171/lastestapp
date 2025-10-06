@@ -103,16 +103,16 @@ export default function PatientDetailScreen() {
   useEffect(() => {
     const fetchPatientData = async () => {
       try {
-        const patientRes = await axios.get(`http://192.168.100.69:3000/patients/${id}`);
+        const patientRes = await axios.get(`http://192.168.100.146:3000/patients/${id}`);
         setPatient(patientRes.data);
 
-        const notesRes = await axios.get(`http://192.168.100.69:3000/patients/${id}/notes`);
+        const notesRes = await axios.get(`http://192.168.100.146:3000/patients/${id}/notes`);
         setNotes(notesRes.data);
 
-        const labRes = await axios.get(`http://192.168.100.69:3000/patients/${id}/lab`);
+        const labRes = await axios.get(`http://192.168.100.146:3000/patients/${id}/lab`);
         setLabReports(labRes.data);
 
-        const radRes = await axios.get(`http://192.168.100.69:3000/patients/${id}/radiology`);
+        const radRes = await axios.get(`http://192.168.100.146:3000/patients/${id}/radiology`);
         setRadiologyReports(radRes.data);
       } catch (err) {
         console.error("Error fetching patient details:", err);
