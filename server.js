@@ -34,7 +34,9 @@ await initDb();
 // Fetch all admins
 app.get("/admin", async (req, res) => {
   try {
-    const [results] = await db.query("SELECT ADMIN_ID, GR_EMPLOYER_LOGIN FROM admin");
+    const [results] = await db.query(
+      "SELECT ADMIN_ID, GR_EMPLOYER_LOGIN FROM admin"
+    );
     res.json(results);
   } catch (err) {
     res.status(500).json({ error: "Database error", details: err });
@@ -44,15 +46,19 @@ app.get("/admin", async (req, res) => {
 // POST login
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
-  if (!username || !password) return res.status(400).json({ error: "Missing credentials" });
+  if (!username || !password)
+    return res.status(400).json({ error: "Missing credentials" });
 
   try {
     const [results] = await db.query(
       "SELECT ADMIN_ID, GR_EMPLOYER_LOGIN FROM admin_users WHERE ADMIN_ID = ? AND GR_EMPLOYER_LOGIN = ? LIMIT 1",
       [username, password]
     );
-    if (results.length > 0) res.json({ success: true, user: results[0] });
-    else res.status(401).json({ success: false, error: "Invalid credentials" });
+
+    if (results.length > 0)
+      res.json({ success: true, user: results[0] });
+    else
+      res.status(401).json({ success: false, error: "Invalid credentials" });
   } catch (err) {
     res.status(500).json({ error: "Database error", details: err });
   }
@@ -70,6 +76,7 @@ app.get("/search", async (req, res) => {
   if (!query) return res.status(400).json({ error: "Query is required" });
 
   const offset = (page - 1) * limit;
+
   try {
     const [results] = await db.query(
       `SELECT PATIENT_ID, PMR_NO, PATIENT_FNAME, GENDER, DISTRICT, DOB, MOBILE_NO,
@@ -111,7 +118,8 @@ app.get("/patients_all", async (req, res) => {
     const params = [];
 
     if (search) {
-      sql += " AND (pr.PATIENT_FNAME LIKE ? OR pr.PATIENT_LNAME LIKE ? OR pr.PMR_NO LIKE ? OR pr.PATIENT_ID LIKE ?)";
+      sql +=
+        " AND (pr.PATIENT_FNAME LIKE ? OR pr.PATIENT_LNAME LIKE ? OR pr.PMR_NO LIKE ? OR pr.PATIENT_ID LIKE ?)";
       const term = `%${search}%`;
       params.push(term, term, term, term);
     }
@@ -148,12 +156,26 @@ app.get("/patients/:id", async (req, res) => {
   }
 });
 
+/* ==========================
+      🔹 PATIENT NOTES
+========================== */
+
 // GET patient notes
 app.get("/patients/:id/notes", async (req, res) => {
   const id = req.params.id;
   try {
     const [results] = await db.query(
-      "SELECT Loc_ID, PATIENT_ID, COALESCE(LocalExamination,'') AS LocalExamination, DATE(loc_ex_date) AS loc_ex_date FROM opd_local_examination WHERE PATIENT_ID = ? ORDER BY Loc_ID DESC",
+      `
+      SELECT 
+        Loc_ID,
+        PATIENT_ID,
+        COALESCE(LocalExamination, '') AS LocalExamination,
+        DATE_FORMAT(loc_ex_date, '%Y-%m-%d %H:%i:%s') AS loc_ex_date,
+        DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS created_at
+      FROM opd_local_examination
+      WHERE PATIENT_ID = ?
+      ORDER BY Loc_ID DESC
+      `,
       [id]
     );
     res.json(results);
@@ -162,11 +184,13 @@ app.get("/patients/:id/notes", async (req, res) => {
   }
 });
 
-// POST patient note
+// POST new patient note
 app.post("/patients/:id/notes", async (req, res) => {
   const patientId = req.params.id;
   const { LocalExamination } = req.body;
-  if (!LocalExamination) return res.status(400).json({ error: "LocalExamination is required" });
+
+  if (!LocalExamination)
+    return res.status(400).json({ error: "LocalExamination is required" });
 
   try {
     const [result] = await db.query(
@@ -229,7 +253,10 @@ app.get("/ward_beds", async (req, res) => {
       "SELECT WARD_ID, WD_OCC_STATUS FROM ward_beds WHERE WARD_ID IN (921,1116,1119)"
     );
     const wardMapping = { 921: "PICU", 1116: "NICU", 1119: "GP" };
-    const formatted = results.map(r => ({ ward: wardMapping[r.WARD_ID] || r.WARD_ID, status: r.WD_OCC_STATUS }));
+    const formatted = results.map(r => ({
+      ward: wardMapping[r.WARD_ID] || r.WARD_ID,
+      status: r.WD_OCC_STATUS
+    }));
     res.json(formatted);
   } catch (err) {
     res.status(500).json({ error: "Database error", details: err });

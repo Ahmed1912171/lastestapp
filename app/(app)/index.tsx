@@ -100,12 +100,11 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [today, setToday] = useState("");
 
+   const LOCAL_IP = "192.168.101.12";
+
   // ---------- New state for Total Tests ----------
   const [testCount, setTestCount] = useState<number | null>(null);
   const [loadingCount, setLoadingCount] = useState<boolean>(false);
-
-  // ---------- Local IP fallback (change to your dev machine IP if different) ----------
-  const LOCAL_IP = "192.168.100.146"; // <-- update if your dev machine IP differs
 
   // ---------- Dynamic Date ----------
   useEffect(() => {
@@ -395,19 +394,65 @@ export default function Dashboard() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#f3f4f6' },
   container: { flex: 1, padding: 16 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+
+  header: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: 16 
+  },
+
   hello: { fontSize: 24, fontWeight: '700' },
   date: { color: '#666' },
-  filters: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  dropdownContainer: { flex: 1, marginRight: 8 },
+
+  // 👇 FIXED HERE
+  filters: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    marginBottom: 16, 
+    position: 'relative',
+    zIndex: 9999, // ensures dropdowns are always on top on web
+  },
+
+  dropdownContainer: { 
+    flex: 1, 
+    marginRight: 8, 
+    position: 'relative', 
+    zIndex: 9999, // higher stacking order for web
+  },
+
   dropdownLabel: { marginBottom: 4, fontWeight: '600' },
-  card: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 16, overflow: 'hidden' },
+
+  // 👇 FIXED HERE — removed overflow: 'hidden'
+  card: { 
+    backgroundColor: '#fff', 
+    borderRadius: 10, 
+    padding: 12, 
+    marginBottom: 16,
+    // overflow: 'hidden', ❌ remove this line, it clips dropdowns
+  },
+
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   cardTitle: { marginLeft: 4, fontSize: 16, fontWeight: '600' },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginVertical: 16 },
-  statCard: { width: '48%', backgroundColor: '#fff', borderRadius: 10, padding: 12, marginBottom: 12 },
+
+  statsGrid: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    justifyContent: 'space-between', 
+    marginVertical: 16 
+  },
+
+  statCard: { 
+    width: '48%', 
+    backgroundColor: '#fff', 
+    borderRadius: 10, 
+    padding: 12, 
+    marginBottom: 12 
+  },
+
   statRow: { flexDirection: 'row', alignItems: 'center' },
   iconWrapper: { padding: 8, backgroundColor: '#f0fdf4', borderRadius: 8, marginRight: 8 },
   statLabel: { fontSize: 12, color: '#666' },
   statValue: { fontSize: 14, fontWeight: '600' },
 });
+

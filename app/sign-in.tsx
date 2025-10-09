@@ -17,7 +17,6 @@ import {
 } from "react-native";
 import { useSession } from "../ctx";
 import colors from "./theme/colors";
-
 export default function LoginScreen() {
   const { signIn } = useSession();
   const router = useRouter();
@@ -29,7 +28,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [bgLoaded, setBgLoaded] = useState(false); // ✅ track bg preload
 
-  const LOCAL_IP = "192.168.100.146";
+  const LOCAL_IP = "192.168.101.12";
 
   const API_URL =
     Platform.OS === "android"

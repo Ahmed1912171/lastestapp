@@ -96,6 +96,19 @@ export default function AppLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="Testtab"
+        options={{
+          title: "Test",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "person" : "person-outline"}
+              size={26}
+              color={color}
+            />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

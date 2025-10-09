@@ -1,8 +1,9 @@
 import axios from "axios";
 import { Eye, FileText, Send } from "lucide-react-native";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Dimensions,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -13,13 +14,13 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  useWindowDimensions,
+  View
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import { GestureHandlerRootView, PinchGestureHandler, PinchGestureHandlerGestureEvent } from "react-native-gesture-handler";
 import Modal from "react-native-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { WebView } from "react-native-webview";
 
 const avatarImg = require("../images/avatar.png");
 const femaleImg = require("../images/female.png");
@@ -35,6 +36,7 @@ type Patient = {
 };
 
 type Note = {
+  created_at: ReactNode;
   Loc_ID: number;
   LocalExamination: string;
   loc_ex_date: string;
@@ -97,8 +99,7 @@ export default function PatientsScreen() {
   const [scale, setScale] = useState(1);
   const [messageText, setMessageText] = useState("");
 
-  useWindowDimensions();
-  const LOCAL_IP = "192.168.100.146";
+  const LOCAL_IP = "192.168.101.12";
   const API_BASE = Platform.OS === "android" ? "http://10.0.2.2:3000" : `http://${LOCAL_IP}:3000`;
 
   const [branch, setBranch] = useState("Korangi");
@@ -111,6 +112,11 @@ export default function PatientsScreen() {
     { label: "NICU", value: "NICU" },
     { label: "GP", value: "GP" },
   ]);
+
+  const webviewRef = useRef<WebView>(null);
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+  const [modalVisible, setModalVisible] = useState(false);
+  const [loadingWeb, setLoadingWeb] = useState(false);
 
   const fetchPatients = useCallback(
     async (pageNum: number = 1, query: string = "") => {
@@ -171,6 +177,36 @@ export default function PatientsScreen() {
     } finally {
       setModalLoading(false);
       setScale(1);
+      if (type === "radiology") setModalVisible(true); // show webview modal for radiology
+    }
+  };
+
+  const closeModal = () => {
+    setSelectedPatient(null);
+    setNotes([]);
+    setLabReports([]);
+    setRadiologyReports([]);
+    setMessageText("");
+    setModalVisible(false);
+    setScale(1);
+  };
+
+  const handleSend = async () => {
+    if (!messageText.trim() || !selectedPatient) return;
+    try {
+      const res = await axios.post(`${API_BASE}/patients/${selectedPatient.PATIENT_ID}/notes`, {
+        LocalExamination: messageText.trim(),
+      });
+      const newNote: Note = {
+        Loc_ID: res.data.insertId || Date.now(),
+        LocalExamination: messageText.trim(),
+        loc_ex_date: new Date().toISOString(),
+        created_at: undefined,
+      };
+      setNotes((prev) => [newNote, ...prev]);
+      setMessageText("");
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -190,67 +226,30 @@ export default function PatientsScreen() {
     }
   };
 
-  const closeModal = () => {
-    setSelectedPatient(null);
-    setNotes([]);
-    setLabReports([]);
-    setRadiologyReports([]);
-    setMessageText("");
-  };
-
-  // ✅ Add notes function strictly according to backend
-  const handleSend = async () => {
-    if (!messageText.trim() || !selectedPatient) return;
-
-    try {
-      const res = await axios.post(`${API_BASE}/patients/${selectedPatient.PATIENT_ID}/notes`, {
-        LocalExamination: messageText.trim(), // OPD_VISIT_ID optional, backend will handle
-      });
-
-      const newNote: Note = {
-        Loc_ID: res.data.insertId || Date.now(),
-        LocalExamination: messageText.trim(),
-        loc_ex_date: new Date().toISOString(),
-      };
-
-      setNotes((prev) => [newNote, ...prev]);
-      setMessageText("");
-    } catch (err) {
-      console.error("Error adding note:", err);
-    }
-  };
-
-  // ----------------------------- UI Renders -----------------------------
   const renderLabTab = () => {
     if (!labReports.length) return <Text>No lab reports available.</Text>;
-
     const uniqueDates = Array.from(new Set(labReports.map((i) => i.Result_date_time?.split("T")[0]).filter(Boolean)));
     const pivoted: PivotedData[] = [];
     const mapPivot = new Map<string, PivotedData>();
-
     labReports.forEach((item) => {
       const key = `${item.TestID}-${item.ComponentID}`;
       const date = item.Result_date_time?.split("T")[0] || "-";
       if (!mapPivot.has(key)) mapPivot.set(key, { TestID: item.TestID, Heading: item.Heading, ComponentID: item.ComponentID, NormalRange: item.NormalRange });
       mapPivot.get(key)![date] = item.Result || "-";
     });
-
     mapPivot.forEach((row) => pivoted.push(row));
     const grouped: { [testID: string]: PivotedData[] } = {};
     pivoted.forEach((r) => {
       if (!grouped[r.TestID]) grouped[r.TestID] = [];
       grouped[r.TestID].push(r);
     });
-
     const minWidth = Math.max(800, 450 + uniqueDates.length * 120);
-
     const onPinch = (event: PinchGestureHandlerGestureEvent) => {
       let s = event.nativeEvent.scale;
       if (s < 0.8) s = 0.8;
       if (s > 2) s = 2;
       setScale(s);
     };
-
     return (
       <GestureHandlerRootView>
         <PinchGestureHandler onGestureEvent={onPinch}>
@@ -298,6 +297,17 @@ export default function PatientsScreen() {
     if (!selectedPatient) return null;
     if (modalLoading) return <ActivityIndicator size="large" color="#00A652" style={{ marginTop: 20 }} />;
 
+    const radiologyURL = `http://103.140.31.132:8080/chk/oviyam?patientID=${selectedPatient.PATIENT_ID}`;
+    const injectedJS = `
+      (function() {
+        var meta = document.createElement('meta');
+        meta.setAttribute('name', 'viewport');
+        meta.setAttribute('content', 'width=${SCREEN_WIDTH * 0.9}, height=${SCREEN_HEIGHT * 0.7}, initial-scale=2.0, maximum-scale=5.0, user-scalable=yes');
+        document.getElementsByTagName('head')[0].appendChild(meta);
+      })();
+      true;
+    `;
+
     return (
       <View>
         <View style={{ alignItems: "center", marginBottom: 12 }}>
@@ -321,29 +331,96 @@ export default function PatientsScreen() {
 
         <View style={{ marginTop: 12 }}>
           {activeTab === "notes" &&
-            (notes.length ? notes.map((note) => (
-              <View key={note.Loc_ID} style={styles.card}>
-                <Text style={{ fontWeight: "600" }}>Date: {note.loc_ex_date?.split("T")[0]}</Text>
-                <Text>{note.LocalExamination}</Text>
-              </View>
-            )) : <Text>No notes available.</Text>)
-          }
+            (notes.length ? (
+              <ScrollView style={{ paddingHorizontal: 10, marginTop: 10 }}>
+                {notes
+                  .slice()
+                  .reverse()
+                  .map((note, index) => {
+                    const isEven = index % 2 === 0;
+                    const createdAtStr = note.created_at ? String(note.created_at) : "";
+                    return (
+                      <View
+                        key={note.Loc_ID}
+                        style={{
+                          marginVertical: 6,
+                          alignSelf: isEven ? "flex-start" : "flex-end",
+                          maxWidth: "75%",
+                        }}
+                      >
+                        <View
+                          style={{
+                            backgroundColor: isEven ? "#e5e5ea" : "#00A652",
+                            paddingVertical: 10,
+                            paddingHorizontal: 14,
+                            borderRadius: 20,
+                            borderTopLeftRadius: isEven ? 0 : 20,
+                            borderTopRightRadius: isEven ? 20 : 0,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: isEven ? "#000" : "#fff",
+                              fontSize: 14,
+                              lineHeight: 20,
+                            }}
+                          >
+                            {note.LocalExamination}
+                          </Text>
+                        </View>
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            color: "#999",
+                            marginTop: 2,
+                            textAlign: isEven ? "left" : "right",
+                          }}
+                        >
+                          {createdAtStr ? new Date(createdAtStr).toLocaleString() : ""}
+                        </Text>
+                      </View>
+                    );
+                  })}
+              </ScrollView>
+            ) : (
+              <Text style={{ textAlign: "center", marginTop: 20 }}>No notes available.</Text>
+            ))}
+
           {activeTab === "lab" && renderLabTab()}
-          {activeTab === "radiology" &&
-            (radiologyReports.length ? radiologyReports.map((rad) => (
-              <View key={rad.id} style={styles.card}>
-                <Text>PMR No: {rad.pmr_no}</Text>
-                <Text>Status: {rad.status}</Text>
-                <Text>X-Ray: {rad.xray_status}</Text>
-                <Text>CT: {rad.ct_status}</Text>
-                <Text>Priority: {rad.priority}</Text>
-                <Text>Modality: {rad.modality}</Text>
-                <Text>Region: {rad.mod_region}</Text>
-                <Text>Request Time: {rad.request_time}</Text>
-                <Text>History: {rad.short_history}</Text>
-              </View>
-            )) : <Text>No radiology reports available.</Text>)
-          }
+{activeTab === "radiology" && selectedPatient && (
+  <View style={{ height: SCREEN_HEIGHT * 0.7 }}>
+    {/* Refresh Button */}
+    <View style={{ flexDirection: "row", justifyContent: "flex-end", marginBottom: 6 }}>
+      <TouchableOpacity
+        style={{
+          backgroundColor: "#00A652",
+          paddingVertical: 6,
+          paddingHorizontal: 12,
+          borderRadius: 8,
+        }}
+        onPress={() => webviewRef.current?.reload()}
+      >
+        <Text style={{ color: "#fff", fontWeight: "600" }}>
+          {loadingWeb ? "Loading..." : "< Back"}
+        </Text>
+      </TouchableOpacity>
+    </View>
+
+    <WebView
+      ref={webviewRef}
+      source={{ uri: `http://103.140.31.132:8080/chk/oviyam?patientID=${selectedPatient.PMR_NO}` }}
+      style={{ flex: 1, borderRadius: 12 }}
+      javaScriptEnabled
+      domStorageEnabled
+      injectedJavaScript={injectedJS}
+      startInLoadingState
+      onLoadStart={() => setLoadingWeb(true)}
+      onLoadEnd={() => setLoadingWeb(false)}
+    />
+  </View>
+)}
+
+
         </View>
       </View>
     );
@@ -351,6 +428,7 @@ export default function PatientsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Branch/Ward Pickers */}
       <View style={{ flexDirection: "row", marginHorizontal: 12, marginTop: 8, zIndex: 1000 }}>
         <View style={{ flex: 1, marginRight: 6 }}>
           <DropDownPicker
@@ -382,7 +460,12 @@ export default function PatientsScreen() {
         </View>
       </View>
 
-      <TextInput style={styles.searchInput} placeholder="Search patient..." value={searchQuery} onChangeText={setSearchQuery} />
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Search patient..."
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+      />
 
       {loading && page === 1 ? (
         <ActivityIndicator size="large" color="#00A652" style={{ marginTop: 50 }} />
@@ -395,14 +478,11 @@ export default function PatientsScreen() {
               <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
                 <Image source={item.GENDER === "Female" ? femaleImg : avatarImg} style={{ width: 40, height: 40, borderRadius: 20 }} />
                 <View style={{ marginLeft: 8 }}>
-                  <Text style={{ fontWeight: "600" }}>
-                    {item.PATIENT_FNAME} {item.PATIENT_LNAME || ""}
-                  </Text>
+                  <Text style={{ fontWeight: "600" }}>{item.PATIENT_FNAME} {item.PATIENT_LNAME || ""}</Text>
                   <Text style={{ fontSize: 12, color: "#666" }}>MR: {item.PMR_NO}</Text>
                   <Text style={{ fontSize: 12, color: "#666" }}>ID: {item.PATIENT_ID}</Text>
                 </View>
               </View>
-
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                 <TouchableOpacity onPress={() => openModal(item, "notes")} style={styles.button}>
                   <Eye size={16} color="#fff" />
@@ -426,7 +506,13 @@ export default function PatientsScreen() {
       )}
 
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        <Modal isVisible={!!selectedPatient} onBackdropPress={closeModal} onBackButtonPress={closeModal} avoidKeyboard style={{ justifyContent: "center", margin: 16 }}>
+        <Modal
+          isVisible={!!selectedPatient}
+          onBackdropPress={closeModal}
+          onBackButtonPress={closeModal}
+          avoidKeyboard
+          style={{ justifyContent: "center", margin: 16 }}
+        >
           <View style={{ backgroundColor: "#fff", borderRadius: 12, padding: 16, maxHeight: "85%" }}>
             <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator contentContainerStyle={{ paddingBottom: activeTab === "notes" ? 120 : 40 }}>
               {renderModalContent()}
@@ -453,6 +539,7 @@ export default function PatientsScreen() {
   );
 }
 
+// Styles (unchanged)
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f3f4f6" },
   searchInput: { backgroundColor: "#fff", margin: 12, borderRadius: 8, paddingHorizontal: 12, height: 40, borderWidth: 1, borderColor: "#ccc" },
@@ -469,7 +556,7 @@ const styles = StyleSheet.create({
   cellBox: { justifyContent: "center", alignItems: "center", borderRightWidth: 1, borderColor: "#ddd" },
   headerCell: { fontWeight: "bold", fontSize: 12, color: "#fff" },
   inputWrapper: {
-    color:"#000000ff",
+    color: "#000000ff",
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 8,

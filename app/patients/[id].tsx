@@ -98,21 +98,22 @@ export default function PatientDetailScreen() {
   const [labReports, setLabReports] = useState<Lab[]>([]);
   const [radiologyReports, setRadiologyReports] = useState<Radiology[]>([]);
   const [scale, setScale] = useState(1);
+   const LOCAL_IP = "192.168.101.12";
 
   // 🔹 Fetch patient data
   useEffect(() => {
     const fetchPatientData = async () => {
       try {
-        const patientRes = await axios.get(`http://192.168.100.146:3000/patients/${id}`);
+        const patientRes = await axios.get(`http://${LOCAL_IP}:3000/patients/${id}`);
         setPatient(patientRes.data);
 
-        const notesRes = await axios.get(`http://192.168.100.146:3000/patients/${id}/notes`);
+        const notesRes = await axios.get(`http://${LOCAL_IP}:3000/patients/${id}/notes`);
         setNotes(notesRes.data);
 
-        const labRes = await axios.get(`http://192.168.100.146:3000/patients/${id}/lab`);
+        const labRes = await axios.get(`http://${LOCAL_IP}:3000/patients/${id}/lab`);
         setLabReports(labRes.data);
 
-        const radRes = await axios.get(`http://192.168.100.146:3000/patients/${id}/radiology`);
+        const radRes = await axios.get(`http://${LOCAL_IP}:3000/patients/${id}/radiology`);
         setRadiologyReports(radRes.data);
       } catch (err) {
         console.error("Error fetching patient details:", err);
