@@ -1,6 +1,13 @@
+import LabTable from "@/components/LabTable";
 import axios from "axios";
 import { Eye, FileText, Send } from "lucide-react-native";
-import React, { ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -14,10 +21,9 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
-import { GestureHandlerRootView, PinchGestureHandler, PinchGestureHandlerGestureEvent } from "react-native-gesture-handler";
 import Modal from "react-native-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
@@ -82,7 +88,7 @@ const wardMap: Record<number, string> = {
 };
 
 const TABS = ["notes", "lab", "radiology"] as const;
-type TabType = typeof TABS[number];
+type TabType = (typeof TABS)[number];
 
 export default function PatientsScreen() {
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -99,14 +105,19 @@ export default function PatientsScreen() {
   const [scale, setScale] = useState(1);
   const [messageText, setMessageText] = useState("");
 
-  const LOCAL_IP = "192.168.101.12";
-  const API_BASE = Platform.OS === "android" ? "http://10.0.2.2:3000" : `http://${LOCAL_IP}:3000`;
+  const LOCAL_IP = "192.168.100.147";
+  const API_BASE =
+    Platform.OS === "android"
+      ? "http://10.0.2.2:3000"
+      : `http://${LOCAL_IP}:3000`;
 
   const [branch, setBranch] = useState("Korangi");
   const [ward, setWard] = useState("PICU");
   const [branchOpen, setBranchOpen] = useState(false);
   const [wardOpen, setWardOpen] = useState(false);
-  const [branchItemsState, setBranchItemsState] = useState([{ label: "Korangi", value: "Korangi" }]);
+  const [branchItemsState, setBranchItemsState] = useState([
+    { label: "Korangi", value: "Korangi" },
+  ]);
   const [wardItemsState, setWardItemsState] = useState([
     { label: "PICU", value: "PICU" },
     { label: "NICU", value: "NICU" },
@@ -114,7 +125,8 @@ export default function PatientsScreen() {
   ]);
 
   const webviewRef = useRef<WebView>(null);
-  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } =
+    Dimensions.get("window");
   const [modalVisible, setModalVisible] = useState(false);
   const [loadingWeb, setLoadingWeb] = useState(false);
 
@@ -122,15 +134,18 @@ export default function PatientsScreen() {
     async (pageNum: number = 1, query: string = "") => {
       try {
         if (pageNum === 1) setLoading(true);
-        const res = await axios.get(`${API_BASE}/patients_all`, { params: { page: pageNum, limit: 20, search: query } });
+        const res = await axios.get(`${API_BASE}/patients_all`, {
+          params: { page: pageNum, limit: 20, search: query },
+        });
         const data: Patient[] = res.data || [];
         if (pageNum === 1) setPatients(data);
-        else setPatients((prev) => {
-          const map = new Map<string | number, Patient>();
-          for (const p of prev) map.set(p.ADM_REQ_ID ?? p.PATIENT_ID, p);
-          for (const p of data) map.set(p.ADM_REQ_ID ?? p.PATIENT_ID, p);
-          return Array.from(map.values());
-        });
+        else
+          setPatients((prev) => {
+            const map = new Map<string | number, Patient>();
+            for (const p of prev) map.set(p.ADM_REQ_ID ?? p.PATIENT_ID, p);
+            for (const p of data) map.set(p.ADM_REQ_ID ?? p.PATIENT_ID, p);
+            return Array.from(map.values());
+          });
       } catch (err) {
         console.error("Error fetching patients:", err);
       } finally {
@@ -169,9 +184,24 @@ export default function PatientsScreen() {
     setActiveTab(type);
     setModalLoading(true);
     try {
-      if (type === "notes") setNotes((await axios.get(`${API_BASE}/patients/${patient.PATIENT_ID}/notes`)).data);
-      if (type === "lab") setLabReports((await axios.get(`${API_BASE}/patients/${patient.PATIENT_ID}/lab`)).data);
-      if (type === "radiology") setRadiologyReports((await axios.get(`${API_BASE}/patients/${patient.PATIENT_ID}/radiology`)).data);
+      if (type === "notes")
+        setNotes(
+          (await axios.get(`${API_BASE}/patients/${patient.PATIENT_ID}/notes`))
+            .data
+        );
+      if (type === "lab")
+        setLabReports(
+          (await axios.get(`${API_BASE}/patients/${patient.PATIENT_ID}/lab`))
+            .data
+        );
+      if (type === "radiology")
+        setRadiologyReports(
+          (
+            await axios.get(
+              `${API_BASE}/patients/${patient.PATIENT_ID}/radiology`
+            )
+          ).data
+        );
     } catch (err) {
       console.error(err);
     } finally {
@@ -194,9 +224,12 @@ export default function PatientsScreen() {
   const handleSend = async () => {
     if (!messageText.trim() || !selectedPatient) return;
     try {
-      const res = await axios.post(`${API_BASE}/patients/${selectedPatient.PATIENT_ID}/notes`, {
-        LocalExamination: messageText.trim(),
-      });
+      const res = await axios.post(
+        `${API_BASE}/patients/${selectedPatient.PATIENT_ID}/notes`,
+        {
+          LocalExamination: messageText.trim(),
+        }
+      );
       const newNote: Note = {
         Loc_ID: res.data.insertId || Date.now(),
         LocalExamination: messageText.trim(),
@@ -215,9 +248,30 @@ export default function PatientsScreen() {
     setActiveTab(tab);
     setModalLoading(true);
     try {
-      if (tab === "notes") setNotes((await axios.get(`${API_BASE}/patients/${selectedPatient.PATIENT_ID}/notes`)).data);
-      if (tab === "lab") setLabReports((await axios.get(`${API_BASE}/patients/${selectedPatient.PATIENT_ID}/lab`)).data);
-      if (tab === "radiology") setRadiologyReports((await axios.get(`${API_BASE}/patients/${selectedPatient.PATIENT_ID}/radiology`)).data);
+      if (tab === "notes")
+        setNotes(
+          (
+            await axios.get(
+              `${API_BASE}/patients/${selectedPatient.PATIENT_ID}/notes`
+            )
+          ).data
+        );
+      if (tab === "lab")
+        setLabReports(
+          (
+            await axios.get(
+              `${API_BASE}/patients/${selectedPatient.PATIENT_ID}/lab`
+            )
+          ).data
+        );
+      if (tab === "radiology")
+        setRadiologyReports(
+          (
+            await axios.get(
+              `${API_BASE}/patients/${selectedPatient.PATIENT_ID}/radiology`
+            )
+          ).data
+        );
     } catch (err) {
       console.error(err);
     } finally {
@@ -226,76 +280,83 @@ export default function PatientsScreen() {
     }
   };
 
-  const renderLabTab = () => {
-    if (!labReports.length) return <Text>No lab reports available.</Text>;
-    const uniqueDates = Array.from(new Set(labReports.map((i) => i.Result_date_time?.split("T")[0]).filter(Boolean)));
-    const pivoted: PivotedData[] = [];
-    const mapPivot = new Map<string, PivotedData>();
-    labReports.forEach((item) => {
-      const key = `${item.TestID}-${item.ComponentID}`;
-      const date = item.Result_date_time?.split("T")[0] || "-";
-      if (!mapPivot.has(key)) mapPivot.set(key, { TestID: item.TestID, Heading: item.Heading, ComponentID: item.ComponentID, NormalRange: item.NormalRange });
-      mapPivot.get(key)![date] = item.Result || "-";
-    });
-    mapPivot.forEach((row) => pivoted.push(row));
-    const grouped: { [testID: string]: PivotedData[] } = {};
-    pivoted.forEach((r) => {
-      if (!grouped[r.TestID]) grouped[r.TestID] = [];
-      grouped[r.TestID].push(r);
-    });
-    const minWidth = Math.max(800, 450 + uniqueDates.length * 120);
-    const onPinch = (event: PinchGestureHandlerGestureEvent) => {
-      let s = event.nativeEvent.scale;
-      if (s < 0.8) s = 0.8;
-      if (s > 2) s = 2;
-      setScale(s);
-    };
-    return (
-      <GestureHandlerRootView>
-        <PinchGestureHandler onGestureEvent={onPinch}>
-          <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator contentContainerStyle={{ paddingBottom: 8 }}>
-            <View style={{ minWidth }}>
-              <View style={{ transform: [{ scale }], paddingBottom: 8 }}>
-                <View style={[styles.row, styles.headerRow]}>
-                  <Text style={[styles.cell, styles.headerCell, { width: 80 }]}>Test ID</Text>
-                  <Text style={[styles.cell, styles.headerCell, { width: 110 }]}>Heading</Text>
-                  <Text style={[styles.cell, styles.headerCell, { width: 110 }]}>Component</Text>
-                  <Text style={[styles.cell, styles.headerCell, { width: 150 }]}>Normal Range</Text>
-                  {uniqueDates.map((date) => (
-                    <Text key={date} style={[styles.cell, styles.headerCell, { width: 120 }]}>{date}</Text>
-                  ))}
-                </View>
+  // const renderLabTab = () => {
+  //   if (!labReports.length) return <Text>No lab reports available.</Text>;
+  //   const uniqueDates = Array.from(new Set(labReports.map((i) => i.Result_date_time?.split("T")[0]).filter(Boolean)));
+  //   const pivoted: PivotedData[] = [];
+  //   const mapPivot = new Map<string, PivotedData>();
+  //   labReports.forEach((item) => {
+  //     const key = `${item.TestID}-${item.ComponentID}`;
+  //     const date = item.Result_date_time?.split("T")[0] || "-";
+  //     if (!mapPivot.has(key)) mapPivot.set(key, { TestID: item.TestID, Heading: item.Heading, ComponentID: item.ComponentID, NormalRange: item.NormalRange });
+  //     mapPivot.get(key)![date] = item.Result || "-";
+  //   });
+  //   mapPivot.forEach((row) => pivoted.push(row));
+  //   const grouped: { [testID: string]: PivotedData[] } = {};
+  //   pivoted.forEach((r) => {
+  //     if (!grouped[r.TestID]) grouped[r.TestID] = [];
+  //     grouped[r.TestID].push(r);
+  //   });
+  //   const minWidth = Math.max(800, 450 + uniqueDates.length * 120);
+  //   const onPinch = (event: PinchGestureHandlerGestureEvent) => {
+  //     let s = event.nativeEvent.scale;
+  //     if (s < 0.8) s = 0.8;
+  //     if (s > 2) s = 2;
+  //     setScale(s);
+  //   };
+  //   return (
+  //     <GestureHandlerRootView>
+  //       <PinchGestureHandler onGestureEvent={onPinch}>
+  //         <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator contentContainerStyle={{ paddingBottom: 8 }}>
+  //           <View style={{ minWidth }}>
+  //             <View style={{ transform: [{ scale }], paddingBottom: 8 }}>
+  //               <View style={[styles.row, styles.headerRow]}>
+  //                 <Text style={[styles.cell, styles.headerCell, { width: 80 }]}>Test ID</Text>
+  //                 <Text style={[styles.cell, styles.headerCell, { width: 110 }]}>Heading</Text>
+  //                 <Text style={[styles.cell, styles.headerCell, { width: 110 }]}>Component</Text>
+  //                 <Text style={[styles.cell, styles.headerCell, { width: 150 }]}>Normal Range</Text>
+  //                 {uniqueDates.map((date) => (
+  //                   <Text key={date} style={[styles.cell, styles.headerCell, { width: 120 }]}>{date}</Text>
+  //                 ))}
+  //               </View>
 
-                {Object.entries(grouped).map(([testID, rows]) =>
-                  rows.map((row, idx) => (
-                    <View key={`${testID}-${idx}`} style={styles.row}>
-                      {idx === 0 ? (
-                        <View style={[styles.cellBox, { width: 80, backgroundColor: "#f9f9f9" }]}>
-                          <Text style={{ fontSize: 12, fontWeight: "600", textAlign: "center" }}>{testID}</Text>
-                        </View>
-                      ) : (
-                        <View style={[styles.cellBox, { width: 80 }]} />
-                      )}
-                      <Text style={[styles.cell, { width: 110 }]}>{row.Heading}</Text>
-                      <Text style={[styles.cell, { width: 110 }]}>{row.ComponentID}</Text>
-                      <Text style={[styles.cell, { width: 150 }]}>{row.NormalRange}</Text>
-                      {uniqueDates.map((date) => (
-                        <Text key={`${testID}-${idx}-${date}`} style={[styles.cell, { width: 120 }]}>{row[date] || "-"}</Text>
-                      ))}
-                    </View>
-                  ))
-                )}
-              </View>
-            </View>
-          </ScrollView>
-        </PinchGestureHandler>
-      </GestureHandlerRootView>
-    );
-  };
+  //               {Object.entries(grouped).map(([testID, rows]) =>
+  //                 rows.map((row, idx) => (
+  //                   <View key={`${testID}-${idx}`} style={styles.row}>
+  //                     {idx === 0 ? (
+  //                       <View style={[styles.cellBox, { width: 80, backgroundColor: "#f9f9f9" }]}>
+  //                         <Text style={{ fontSize: 12, fontWeight: "600", textAlign: "center" }}>{testID}</Text>
+  //                       </View>
+  //                     ) : (
+  //                       <View style={[styles.cellBox, { width: 80 }]} />
+  //                     )}
+  //                     <Text style={[styles.cell, { width: 110 }]}>{row.Heading}</Text>
+  //                     <Text style={[styles.cell, { width: 110 }]}>{row.ComponentID}</Text>
+  //                     <Text style={[styles.cell, { width: 150 }]}>{row.NormalRange}</Text>
+  //                     {uniqueDates.map((date) => (
+  //                       <Text key={`${testID}-${idx}-${date}`} style={[styles.cell, { width: 120 }]}>{row[date] || "-"}</Text>
+  //                     ))}
+  //                   </View>
+  //                 ))
+  //               )}
+  //             </View>
+  //           </View>
+  //         </ScrollView>
+  //       </PinchGestureHandler>
+  //     </GestureHandlerRootView>
+  //   );
+  // };
 
   const renderModalContent = () => {
     if (!selectedPatient) return null;
-    if (modalLoading) return <ActivityIndicator size="large" color="#00A652" style={{ marginTop: 20 }} />;
+    if (modalLoading)
+      return (
+        <ActivityIndicator
+          size="large"
+          color="#00A652"
+          style={{ marginTop: 20 }}
+        />
+      );
 
     const radiologyURL = `http://103.140.31.132:8080/chk/oviyam?patientID=${selectedPatient.PATIENT_ID}`;
     const injectedJS = `
@@ -311,19 +372,38 @@ export default function PatientsScreen() {
     return (
       <View>
         <View style={{ alignItems: "center", marginBottom: 12 }}>
-          <Image source={selectedPatient.GENDER === "Female" ? femaleImg : avatarImg} style={{ width: 80, height: 80, borderRadius: 40 }} />
+          <Image
+            source={selectedPatient.GENDER === "Female" ? femaleImg : avatarImg}
+            style={{ width: 80, height: 80, borderRadius: 40 }}
+          />
           <Text style={{ fontWeight: "700", fontSize: 18, marginTop: 6 }}>
-            {selectedPatient.PATIENT_FNAME} {selectedPatient.PATIENT_LNAME || ""}
+            {selectedPatient.PATIENT_FNAME}{" "}
+            {selectedPatient.PATIENT_LNAME || ""}
           </Text>
           <Text style={{ color: "#666" }}>MR: {selectedPatient.PMR_NO}</Text>
-          <Text style={{ color: "#666" }}>ID: {selectedPatient.PATIENT_ID}</Text>
+          <Text style={{ color: "#666" }}>
+            ID: {selectedPatient.PATIENT_ID}
+          </Text>
         </View>
 
         <View style={styles.tabRow}>
           {TABS.map((tab) => (
-            <TouchableOpacity key={tab} style={[styles.tabButton, activeTab === tab && styles.tabActive]} onPress={() => handleTabChange(tab)}>
-              <Text style={[styles.tabText, activeTab === tab && { color: "#fff", fontWeight: "700" }]}>
-                {tab === "notes" ? "Notes" : tab === "lab" ? "Lab Reports" : "Radiology"}
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tabButton, activeTab === tab && styles.tabActive]}
+              onPress={() => handleTabChange(tab)}
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  activeTab === tab && { color: "#fff", fontWeight: "700" },
+                ]}
+              >
+                {tab === "notes"
+                  ? "Notes"
+                  : tab === "lab"
+                    ? "Lab Reports"
+                    : "Radiology"}
               </Text>
             </TouchableOpacity>
           ))}
@@ -338,7 +418,9 @@ export default function PatientsScreen() {
                   .reverse()
                   .map((note, index) => {
                     const isEven = index % 2 === 0;
-                    const createdAtStr = note.created_at ? String(note.created_at) : "";
+                    const createdAtStr = note.created_at
+                      ? String(note.created_at)
+                      : "";
                     return (
                       <View
                         key={note.Loc_ID}
@@ -376,51 +458,64 @@ export default function PatientsScreen() {
                             textAlign: isEven ? "left" : "right",
                           }}
                         >
-                          {createdAtStr ? new Date(createdAtStr).toLocaleString() : ""}
+                          {createdAtStr
+                            ? new Date(createdAtStr).toLocaleString()
+                            : ""}
                         </Text>
                       </View>
                     );
                   })}
               </ScrollView>
             ) : (
-              <Text style={{ textAlign: "center", marginTop: 20 }}>No notes available.</Text>
+              <Text style={{ textAlign: "center", marginTop: 20 }}>
+                No notes available.
+              </Text>
             ))}
 
-          {activeTab === "lab" && renderLabTab()}
-{activeTab === "radiology" && selectedPatient && (
-  <View style={{ height: SCREEN_HEIGHT * 0.7 }}>
-    {/* Refresh Button */}
-    <View style={{ flexDirection: "row", justifyContent: "flex-end", marginBottom: 6 }}>
-      <TouchableOpacity
-        style={{
-          backgroundColor: "#00A652",
-          paddingVertical: 6,
-          paddingHorizontal: 12,
-          borderRadius: 8,
-        }}
-        onPress={() => webviewRef.current?.reload()}
-      >
-        <Text style={{ color: "#fff", fontWeight: "600" }}>
-          {loadingWeb ? "Loading..." : "< Back"}
-        </Text>
-      </TouchableOpacity>
-    </View>
+          {activeTab === "lab" && selectedPatient && (
+            <LabTable patientId={String(selectedPatient.PATIENT_ID)} />
+          )}
 
-    <WebView
-      ref={webviewRef}
-      source={{ uri: `http://103.140.31.132:8080/chk/oviyam?patientID=${selectedPatient.PMR_NO}` }}
-      style={{ flex: 1, borderRadius: 12 }}
-      javaScriptEnabled
-      domStorageEnabled
-      injectedJavaScript={injectedJS}
-      startInLoadingState
-      onLoadStart={() => setLoadingWeb(true)}
-      onLoadEnd={() => setLoadingWeb(false)}
-    />
-  </View>
-)}
+          {activeTab === "radiology" && selectedPatient && (
+            <View style={{ height: SCREEN_HEIGHT * 0.7 }}>
+              {/* Refresh Button */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "flex-end",
+                  marginBottom: 6,
+                }}
+              >
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: "#00A652",
+                    paddingVertical: 6,
+                    paddingHorizontal: 12,
+                    borderRadius: 8,
+                  }}
+                  onPress={() => webviewRef.current?.reload()}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "600" }}>
+                    {loadingWeb ? "Loading..." : "< Back"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
-
+              <WebView
+                ref={webviewRef}
+                source={{
+                  uri: `http://103.140.31.132:8080/chk/oviyam?patientID=${selectedPatient.PMR_NO}`,
+                }}
+                style={{ flex: 1, borderRadius: 12 }}
+                javaScriptEnabled
+                domStorageEnabled
+                injectedJavaScript={injectedJS}
+                startInLoadingState
+                onLoadStart={() => setLoadingWeb(true)}
+                onLoadEnd={() => setLoadingWeb(false)}
+              />
+            </View>
+          )}
         </View>
       </View>
     );
@@ -429,7 +524,14 @@ export default function PatientsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Branch/Ward Pickers */}
-      <View style={{ flexDirection: "row", marginHorizontal: 12, marginTop: 8, zIndex: 1000 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          marginHorizontal: 12,
+          marginTop: 8,
+          zIndex: 1000,
+        }}
+      >
         <View style={{ flex: 1, marginRight: 6 }}>
           <DropDownPicker
             open={branchOpen}
@@ -468,31 +570,64 @@ export default function PatientsScreen() {
       />
 
       {loading && page === 1 ? (
-        <ActivityIndicator size="large" color="#00A652" style={{ marginTop: 50 }} />
+        <ActivityIndicator
+          size="large"
+          color="#00A652"
+          style={{ marginTop: 50 }}
+        />
       ) : (
         <FlatList
           data={filteredPatients}
           keyExtractor={(item) => String(item.ADM_REQ_ID ?? item.PATIENT_ID)}
           renderItem={({ item }) => (
             <View style={styles.card}>
-              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
-                <Image source={item.GENDER === "Female" ? femaleImg : avatarImg} style={{ width: 40, height: 40, borderRadius: 20 }} />
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginBottom: 6,
+                }}
+              >
+                <Image
+                  source={item.GENDER === "Female" ? femaleImg : avatarImg}
+                  style={{ width: 40, height: 40, borderRadius: 20 }}
+                />
                 <View style={{ marginLeft: 8 }}>
-                  <Text style={{ fontWeight: "600" }}>{item.PATIENT_FNAME} {item.PATIENT_LNAME || ""}</Text>
-                  <Text style={{ fontSize: 12, color: "#666" }}>MR: {item.PMR_NO}</Text>
-                  <Text style={{ fontSize: 12, color: "#666" }}>ID: {item.PATIENT_ID}</Text>
+                  <Text style={{ fontWeight: "600" }}>
+                    {item.PATIENT_FNAME} {item.PATIENT_LNAME || ""}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: "#666" }}>
+                    MR: {item.PMR_NO}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: "#666" }}>
+                    ID: {item.PATIENT_ID}
+                  </Text>
                 </View>
               </View>
-              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                <TouchableOpacity onPress={() => openModal(item, "notes")} style={styles.button}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                }}
+              >
+                <TouchableOpacity
+                  onPress={() => openModal(item, "notes")}
+                  style={styles.button}
+                >
                   <Eye size={16} color="#fff" />
                   <Text style={styles.buttonText}>Notes</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => openModal(item, "lab")} style={styles.button}>
+                <TouchableOpacity
+                  onPress={() => openModal(item, "lab")}
+                  style={styles.button}
+                >
                   <FileText size={16} color="#fff" />
                   <Text style={styles.buttonText}>Lab Reports</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => openModal(item, "radiology")} style={styles.button}>
+                <TouchableOpacity
+                  onPress={() => openModal(item, "radiology")}
+                  style={styles.button}
+                >
                   <FileText size={16} color="#fff" />
                   <Text style={styles.buttonText}>Radiology</Text>
                 </TouchableOpacity>
@@ -501,11 +636,16 @@ export default function PatientsScreen() {
           )}
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
         />
       )}
 
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
+      >
         <Modal
           isVisible={!!selectedPatient}
           onBackdropPress={closeModal}
@@ -513,8 +653,22 @@ export default function PatientsScreen() {
           avoidKeyboard
           style={{ justifyContent: "center", margin: 16 }}
         >
-          <View style={{ backgroundColor: "#fff", borderRadius: 12, padding: 16, maxHeight: "85%" }}>
-            <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator contentContainerStyle={{ paddingBottom: activeTab === "notes" ? 120 : 40 }}>
+          <View
+            style={{
+              backgroundColor: "#fff",
+              borderRadius: 12,
+              padding: 16,
+              maxHeight: "85%",
+            }}
+          >
+            <ScrollView
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator
+              contentContainerStyle={{
+                paddingBottom: activeTab === "notes" ? 120 : 40,
+              }}
+            >
               {renderModalContent()}
             </ScrollView>
 
@@ -527,7 +681,10 @@ export default function PatientsScreen() {
                   onChangeText={setMessageText}
                   multiline
                 />
-                <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
+                <TouchableOpacity
+                  style={styles.sendButton}
+                  onPress={handleSend}
+                >
                   <Send size={20} color="#fff" />
                 </TouchableOpacity>
               </View>
@@ -542,18 +699,61 @@ export default function PatientsScreen() {
 // Styles (unchanged)
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f3f4f6" },
-  searchInput: { backgroundColor: "#fff", margin: 12, borderRadius: 8, paddingHorizontal: 12, height: 40, borderWidth: 1, borderColor: "#ccc" },
-  card: { backgroundColor: "#fff", borderRadius: 10, padding: 12, marginHorizontal: 12, marginVertical: 6 },
-  button: { flexDirection: "row", backgroundColor: "#00A652", paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, alignItems: "center", marginHorizontal: 4 },
+  searchInput: {
+    backgroundColor: "#fff",
+    margin: 12,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 40,
+    borderWidth: 1,
+    borderColor: "#ccc",
+  },
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 12,
+    marginHorizontal: 12,
+    marginVertical: 6,
+  },
+  button: {
+    flexDirection: "row",
+    backgroundColor: "#00A652",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: "center",
+    marginHorizontal: 4,
+  },
   buttonText: { color: "#fff", fontWeight: "600", marginLeft: 4 },
   tabRow: { flexDirection: "row", marginBottom: 8 },
-  tabButton: { flex: 1, padding: 8, borderWidth: 1, borderColor: "#00A652", borderRadius: 8, marginHorizontal: 4, alignItems: "center" },
+  tabButton: {
+    flex: 1,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: "#00A652",
+    borderRadius: 8,
+    marginHorizontal: 4,
+    alignItems: "center",
+  },
   tabActive: { backgroundColor: "#00A652" },
   tabText: { color: "#00A652", fontWeight: "600" },
   row: { flexDirection: "row", borderBottomWidth: 1, borderColor: "#ddd" },
   headerRow: { backgroundColor: "#00A652", borderBottomWidth: 1 },
-  cell: { paddingVertical: 6, paddingHorizontal: 6, fontSize: 12, textAlign: "center", color: "#000", borderRightWidth: 1, borderColor: "#ddd" },
-  cellBox: { justifyContent: "center", alignItems: "center", borderRightWidth: 1, borderColor: "#ddd" },
+  cell: {
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+    fontSize: 12,
+    textAlign: "center",
+    color: "#000",
+    borderRightWidth: 1,
+    borderColor: "#ddd",
+  },
+  cellBox: {
+    justifyContent: "center",
+    alignItems: "center",
+    borderRightWidth: 1,
+    borderColor: "#ddd",
+  },
   headerCell: { fontWeight: "bold", fontSize: 12, color: "#fff" },
   inputWrapper: {
     color: "#000000ff",

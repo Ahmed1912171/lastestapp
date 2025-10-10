@@ -17,7 +17,7 @@ async function initDb() {
       user: "labintegration",
       password: "chkefro",
       database: "convert_april",
-      connectTimeout: 10000
+      connectTimeout: 10000,
     });
     console.log("✅ Connected to database");
   } catch (err) {
@@ -55,10 +55,8 @@ app.post("/login", async (req, res) => {
       [username, password]
     );
 
-    if (results.length > 0)
-      res.json({ success: true, user: results[0] });
-    else
-      res.status(401).json({ success: false, error: "Invalid credentials" });
+    if (results.length > 0) res.json({ success: true, user: results[0] });
+    else res.status(401).json({ success: false, error: "Invalid credentials" });
   } catch (err) {
     res.status(500).json({ error: "Database error", details: err });
   }
@@ -149,7 +147,8 @@ app.get("/patients/:id", async (req, res) => {
       "SELECT PATIENT_ID, PATIENT_FNAME, GENDER, DISTRICT, DOB, MOBILE_NO, TIMESTAMPDIFF(YEAR, DOB, CURDATE()) AS AGE FROM prg_patient_reg WHERE PATIENT_ID = ?",
       [patientId]
     );
-    if (results.length === 0) return res.status(404).json({ error: "Patient not found" });
+    if (results.length === 0)
+      return res.status(404).json({ error: "Patient not found" });
     res.json(results[0]);
   } catch (err) {
     res.status(500).json({ error: "Database error", details: err });
@@ -253,9 +252,9 @@ app.get("/ward_beds", async (req, res) => {
       "SELECT WARD_ID, WD_OCC_STATUS FROM ward_beds WHERE WARD_ID IN (921,1116,1119)"
     );
     const wardMapping = { 921: "PICU", 1116: "NICU", 1119: "GP" };
-    const formatted = results.map(r => ({
+    const formatted = results.map((r) => ({
       ward: wardMapping[r.WARD_ID] || r.WARD_ID,
-      status: r.WD_OCC_STATUS
+      status: r.WD_OCC_STATUS,
     }));
     res.json(formatted);
   } catch (err) {
@@ -269,7 +268,9 @@ app.get("/ward_beds", async (req, res) => {
 
 app.get("/tr_newris_request/count", async (req, res) => {
   try {
-    const [results] = await db.query("SELECT COUNT(*) AS total_count FROM tr_newris_request");
+    const [results] = await db.query(
+      "SELECT COUNT(*) AS total_count FROM tr_newris_request"
+    );
     res.json(results[0]);
   } catch (err) {
     res.status(500).json({ error: "Database error", details: err });

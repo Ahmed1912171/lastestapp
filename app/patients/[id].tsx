@@ -9,14 +9,11 @@ import {
   Text,
   TouchableOpacity,
   View,
-  useWindowDimensions,
 } from "react-native";
-import {
-  GestureHandlerRootView,
-  PinchGestureHandler,
-} from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+// ✅ Import the new component
+import LabTable from "../../components/LabTable";
 
 // ✅ Images
 const avatarImg = require("../images/avatar.png");
@@ -37,41 +34,6 @@ type PatientDetail = {
 
 type Note = { Loc_ID: number; date: string; LocalExamination: string };
 
-type Lab = {
-  id: number;
-  LabNo: string;
-  TestID: string;
-  Order_Id: number;
-  Barcode_no: string;
-  Patient_ID: number;
-  Result_date_time: string;
-  Read: number;
-  ComponentID: string;
-  Unit: string;
-  Result: string;
-  NormalRange: string;
-  TranOrder: number;
-  Heading: string;
-  Remarks: string | null;
-  IncludeInWorkSheet: number;
-  IncludeInResult: number;
-  ResultHeading: string;
-  PIV: string;
-  CutOffValue: string;
-  Reader: string;
-  Ready: number;
-  IsTechnologist: number;
-  IsPathologist: number;
-};
-
-type PivotedData = {
-  TestID: string;
-  Heading: string;
-  ComponentID: string;
-  NormalRange: string;
-  [date: string]: string;
-};
-
 type Radiology = {
   id: number;
   pmr_no: string;
@@ -88,17 +50,12 @@ type Radiology = {
 
 export default function PatientDetailScreen() {
   const { id } = useLocalSearchParams();
-  const { height } = useWindowDimensions();
-
   const [patient, setPatient] = useState<PatientDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<"notes" | "lab" | "radiology">("notes");
-
   const [notes, setNotes] = useState<Note[]>([]);
-  const [labReports, setLabReports] = useState<Lab[]>([]);
   const [radiologyReports, setRadiologyReports] = useState<Radiology[]>([]);
-  const [scale, setScale] = useState(1);
-   const LOCAL_IP = "192.168.101.12";
+  const LOCAL_IP = "192.168.100.147";
 
   // 🔹 Fetch patient data
   useEffect(() => {
@@ -109,9 +66,6 @@ export default function PatientDetailScreen() {
 
         const notesRes = await axios.get(`http://${LOCAL_IP}:3000/patients/${id}/notes`);
         setNotes(notesRes.data);
-
-        const labRes = await axios.get(`http://${LOCAL_IP}:3000/patients/${id}/lab`);
-        setLabReports(labRes.data);
 
         const radRes = await axios.get(`http://${LOCAL_IP}:3000/patients/${id}/radiology`);
         setRadiologyReports(radRes.data);
@@ -139,42 +93,6 @@ export default function PatientDetailScreen() {
       </SafeAreaView>
     );
   }
-
-  // 🔹 Pivot lab data for table
-  const uniqueDates = Array.from(
-    new Set(
-      labReports.map((item) =>
-        item.Result_date_time ? item.Result_date_time.split("T")[0] : ""
-      )
-    )
-  ).filter(Boolean);
-
-  const pivoted: PivotedData[] = [];
-  const map = new Map<string, PivotedData>();
-
-  labReports.forEach((item) => {
-    const key = `${item.TestID}-${item.ComponentID}`;
-    const date = item.Result_date_time ? item.Result_date_time.split("T")[0] : "-";
-
-    if (!map.has(key)) {
-      map.set(key, {
-        TestID: item.TestID,
-        Heading: item.Heading,
-        ComponentID: item.ComponentID,
-        NormalRange: item.NormalRange,
-      });
-    }
-    const row = map.get(key)!;
-    row[date] = item.Result || "-";
-  });
-
-  map.forEach((row) => pivoted.push(row));
-
-  const grouped: { [testID: string]: PivotedData[] } = {};
-  pivoted.forEach((row) => {
-    if (!grouped[row.TestID]) grouped[row.TestID] = [];
-    grouped[row.TestID].push(row);
-  });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -251,95 +169,10 @@ export default function PatientDetailScreen() {
               <Text>No notes available.</Text>
             ))}
 
-          {/* Lab Reports */}
-          {activeTab === "lab" &&
-            (labReports.length > 0 ? (
-              <GestureHandlerRootView>
-                <PinchGestureHandler
-                  onGestureEvent={(e) => {
-                    let newScale = e.nativeEvent.scale;
-                    if (newScale < 0.8) newScale = 0.8;
-                    if (newScale > 2) newScale = 2;
-                    setScale(newScale);
-                  }}
-                >
-                  <ScrollView horizontal>
-                    <View style={{ minWidth: 800, marginBottom: 20 }}>
-                      <ScrollView style={{ maxHeight: height - 200 }}>
-                        <View style={{ transform: [{ scale }] }}>
-                          {/* Table Header */}
-                          <View style={[styles.row, styles.headerRow]}>
-                            <Text style={[styles.cell, styles.headerCell, { width: 80 }]}>
-                              Test ID
-                            </Text>
-                            <Text style={[styles.cell, styles.headerCell, { width: 110 }]}>
-                              Heading
-                            </Text>
-                            <Text style={[styles.cell, styles.headerCell, { width: 110 }]}>
-                              Component
-                            </Text>
-                            <Text style={[styles.cell, styles.headerCell, { width: 150 }]}>
-                              Normal Range
-                            </Text>
-                            {uniqueDates.map((date) => (
-                              <Text
-                                key={date}
-                                style={[styles.cell, styles.headerCell, { width: 120 }]}
-                              >
-                                {date}
-                              </Text>
-                            ))}
-                          </View>
-
-                          {/* Table Rows */}
-                          {Object.entries(grouped).map(([testID, rows]) =>
-                            rows.map((row, idx) => (
-                              <View key={`${testID}-${idx}`} style={styles.row}>
-                                {idx === 0 ? (
-                                  <View
-                                    style={[
-                                      styles.cellBox,
-                                      { width: 80, backgroundColor: "#f9f9f9" },
-                                    ]}
-                                  >
-                                    <Text
-                                      style={{
-                                        fontSize: 12,
-                                        fontWeight: "600",
-                                        textAlign: "center",
-                                      }}
-                                    >
-                                      {testID}
-                                    </Text>
-                                  </View>
-                                ) : (
-                                  <View
-                                    style={[styles.cellBox, { width: 80, backgroundColor: "#fff" }]}
-                                  />
-                                )}
-                                <Text style={[styles.cell, { width: 110 }]}>{row.Heading}</Text>
-                                <Text style={[styles.cell, { width: 110 }]}>{row.ComponentID}</Text>
-                                <Text style={[styles.cell, { width: 150 }]}>{row.NormalRange}</Text>
-                                {uniqueDates.map((date) => (
-                                  <Text
-                                    key={`${testID}-${idx}-${date}`}
-                                    style={[styles.cell, { width: 120 }]}
-                                  >
-                                    {row[date] || "-"}
-                                  </Text>
-                                ))}
-                              </View>
-                            ))
-                          )}
-                        </View>
-                      </ScrollView>
-                    </View>
-                  </ScrollView>
-                </PinchGestureHandler>
-              </GestureHandlerRootView>
-            ) : (
-              <Text>No lab reports available.</Text>
-            ))}
+          {/* ✅ Lab Reports — replaced with component */}
+          {activeTab === "lab" && patient?.PATIENT_ID && (
+            <LabTable patientId={String(patient.PATIENT_ID)} />
+          )}
 
           {/* Radiology */}
           {activeTab === "radiology" &&
@@ -414,19 +247,4 @@ const styles = StyleSheet.create({
   },
   reportLabel: { fontWeight: "600", fontSize: 14, color: "#000", flex: 1 },
   reportValue: { fontSize: 14, color: "#333", flex: 1, textAlign: "right" },
-
-  // Lab Table
-  row: { flexDirection: "row", borderBottomWidth: 1, borderColor: "#ddd" },
-  headerRow: { backgroundColor: "#00A652", borderBottomWidth: 1 },
-  cell: {
-    paddingVertical: 6,
-    paddingHorizontal: 6,
-    fontSize: 12,
-    textAlign: "center",
-    color: "#000",
-    borderRightWidth: 1,
-    borderColor: "#ddd",
-  },
-  cellBox: { justifyContent: "center", alignItems: "center", borderRightWidth: 1, borderColor: "#ddd" },
-  headerCell: { fontWeight: "bold", fontSize: 12, color: "#fff" },
 });
