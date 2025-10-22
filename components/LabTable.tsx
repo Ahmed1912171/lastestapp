@@ -27,7 +27,7 @@ const LabTable: React.FC<LabTableProps> = ({ patientId }) => {
     const fetchData = async () => {
       try {
         const { data } = await axios.get(
-          `http://192.168.100.147:3000/patients/${patientId}/lab`
+          `http:192.168.100.116:3000/patients/${patientId}/lab`
         );
 
         if (!data || data.length === 0) {
@@ -81,12 +81,11 @@ const LabTable: React.FC<LabTableProps> = ({ patientId }) => {
           if (!mapPivot.has(key)) {
             mapPivot.set(key, {
               TestID: item.TestID || "-",
-              TestTitle: item.TestTitle || "-", // ✅ added
-              Unit: item.Unit || "-", // ✅ added
+              TestTitle: item.TestTitle || "-",
+              Unit: item.Unit || "-",
               Heading: item.Heading || "-",
               ComponentID: item.ComponentID || "-",
               NormalRange: item.NormalRange || "-",
-              Result: item.Result || "-",
               Barcodes: new Set<string>(
                 item.Barcode_no ? [String(item.Barcode_no)] : []
               ),
@@ -164,13 +163,12 @@ const LabTable: React.FC<LabTableProps> = ({ patientId }) => {
 
         mapPivot.forEach((row) => pivoted.push(row));
 
-        // Headers
+        // ✅ Headers without Result column
         const baseHeaders = [
           "Test ID",
           "Test Name",
           "Unit",
           "Component ID",
-          "Result",
           "Normal Range",
         ];
 
@@ -187,37 +185,33 @@ const LabTable: React.FC<LabTableProps> = ({ patientId }) => {
           ? [...baseHeaders, ...cultureHeaders, ...uniqueDates]
           : [...baseHeaders, ...uniqueDates];
 
-        // Rows
+        // ✅ Rows without Result column, aligned properly
         const rows = pivoted.map((row) => {
           const baseRow = [
             row.TestID,
             row.TestTitle,
-            row.ComponentID,
             row.Unit,
-            row.Result,
+            row.ComponentID,
             row.NormalRange,
           ];
 
-          if (hasCulture) {
-            const cultureValues = [
-              row.TypeofSpecimen || "-",
-              row.growth_type || "-",
-              row.Puss_cell || "-",
-              row.Gram_stain || "-",
-              row.Wet_Mount || "-",
-              row.Culture || "-",
-            ];
-            return [
-              ...baseRow,
-              ...cultureValues,
-              ...uniqueDates.map((d) => row[d] || "-"),
-            ];
-          } else {
-            return [...baseRow, ...uniqueDates.map((d) => row[d] || "-")];
-          }
+          const cultureValues = hasCulture
+            ? [
+                row.TypeofSpecimen || "-",
+                row.growth_type || "-",
+                row.Puss_cell || "-",
+                row.Gram_stain || "-",
+                row.Wet_Mount || "-",
+                row.Culture || "-",
+              ]
+            : [];
+
+          const dateValues = uniqueDates.map((d) => row[d] || "-");
+
+          return [...baseRow, ...cultureValues, ...dateValues];
         });
 
-        // Merge cells for TestID
+        // Merge cells only for TestID
         const mergeCells: any[] = [];
         let startRow = 0;
         for (let i = 1; i < rows.length; i++) {
@@ -250,7 +244,7 @@ const LabTable: React.FC<LabTableProps> = ({ patientId }) => {
           <!DOCTYPE html>
           <html>
             <head>
-              <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, minimum-scale=0.5, maximum-scale=5.0">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
               <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css">
               <script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
               <style>

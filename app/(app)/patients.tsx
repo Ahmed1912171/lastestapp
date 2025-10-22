@@ -1,6 +1,8 @@
+import AIChatModal from "@/components/AIChatModal";
 import LabTable from "@/components/LabTable";
+import PharmacyTable from "@/components/PharmacyTable";
 import axios from "axios";
-import { Eye, FileText, Send } from "lucide-react-native";
+import { Bot, FileText, Send } from "lucide-react-native";
 import React, {
   ReactNode,
   useCallback,
@@ -87,7 +89,7 @@ const wardMap: Record<number, string> = {
   1119: "GP",
 };
 
-const TABS = ["notes", "lab", "radiology"] as const;
+const TABS = ["notes", "lab", "radiology", "pharmacy"] as const;
 type TabType = (typeof TABS)[number];
 
 export default function PatientsScreen() {
@@ -104,8 +106,11 @@ export default function PatientsScreen() {
   const [modalLoading, setModalLoading] = useState(false);
   const [scale, setScale] = useState(1);
   const [messageText, setMessageText] = useState("");
+  // AI Chat Modal State
+  const [aiModalVisible, setAiModalVisible] = useState(false);
+  const [aiPatientId, setAiPatientId] = useState<number | null>(null);
 
-  const LOCAL_IP = "192.168.100.147";
+  const LOCAL_IP = "192.168.100.116";
   const API_BASE =
     Platform.OS === "android"
       ? "http://10.0.2.2:3000"
@@ -207,7 +212,7 @@ export default function PatientsScreen() {
     } finally {
       setModalLoading(false);
       setScale(1);
-      if (type === "radiology") setModalVisible(true); // show webview modal for radiology
+      setModalVisible(true);
     }
   };
 
@@ -280,73 +285,6 @@ export default function PatientsScreen() {
     }
   };
 
-  // const renderLabTab = () => {
-  //   if (!labReports.length) return <Text>No lab reports available.</Text>;
-  //   const uniqueDates = Array.from(new Set(labReports.map((i) => i.Result_date_time?.split("T")[0]).filter(Boolean)));
-  //   const pivoted: PivotedData[] = [];
-  //   const mapPivot = new Map<string, PivotedData>();
-  //   labReports.forEach((item) => {
-  //     const key = `${item.TestID}-${item.ComponentID}`;
-  //     const date = item.Result_date_time?.split("T")[0] || "-";
-  //     if (!mapPivot.has(key)) mapPivot.set(key, { TestID: item.TestID, Heading: item.Heading, ComponentID: item.ComponentID, NormalRange: item.NormalRange });
-  //     mapPivot.get(key)![date] = item.Result || "-";
-  //   });
-  //   mapPivot.forEach((row) => pivoted.push(row));
-  //   const grouped: { [testID: string]: PivotedData[] } = {};
-  //   pivoted.forEach((r) => {
-  //     if (!grouped[r.TestID]) grouped[r.TestID] = [];
-  //     grouped[r.TestID].push(r);
-  //   });
-  //   const minWidth = Math.max(800, 450 + uniqueDates.length * 120);
-  //   const onPinch = (event: PinchGestureHandlerGestureEvent) => {
-  //     let s = event.nativeEvent.scale;
-  //     if (s < 0.8) s = 0.8;
-  //     if (s > 2) s = 2;
-  //     setScale(s);
-  //   };
-  //   return (
-  //     <GestureHandlerRootView>
-  //       <PinchGestureHandler onGestureEvent={onPinch}>
-  //         <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator contentContainerStyle={{ paddingBottom: 8 }}>
-  //           <View style={{ minWidth }}>
-  //             <View style={{ transform: [{ scale }], paddingBottom: 8 }}>
-  //               <View style={[styles.row, styles.headerRow]}>
-  //                 <Text style={[styles.cell, styles.headerCell, { width: 80 }]}>Test ID</Text>
-  //                 <Text style={[styles.cell, styles.headerCell, { width: 110 }]}>Heading</Text>
-  //                 <Text style={[styles.cell, styles.headerCell, { width: 110 }]}>Component</Text>
-  //                 <Text style={[styles.cell, styles.headerCell, { width: 150 }]}>Normal Range</Text>
-  //                 {uniqueDates.map((date) => (
-  //                   <Text key={date} style={[styles.cell, styles.headerCell, { width: 120 }]}>{date}</Text>
-  //                 ))}
-  //               </View>
-
-  //               {Object.entries(grouped).map(([testID, rows]) =>
-  //                 rows.map((row, idx) => (
-  //                   <View key={`${testID}-${idx}`} style={styles.row}>
-  //                     {idx === 0 ? (
-  //                       <View style={[styles.cellBox, { width: 80, backgroundColor: "#f9f9f9" }]}>
-  //                         <Text style={{ fontSize: 12, fontWeight: "600", textAlign: "center" }}>{testID}</Text>
-  //                       </View>
-  //                     ) : (
-  //                       <View style={[styles.cellBox, { width: 80 }]} />
-  //                     )}
-  //                     <Text style={[styles.cell, { width: 110 }]}>{row.Heading}</Text>
-  //                     <Text style={[styles.cell, { width: 110 }]}>{row.ComponentID}</Text>
-  //                     <Text style={[styles.cell, { width: 150 }]}>{row.NormalRange}</Text>
-  //                     {uniqueDates.map((date) => (
-  //                       <Text key={`${testID}-${idx}-${date}`} style={[styles.cell, { width: 120 }]}>{row[date] || "-"}</Text>
-  //                     ))}
-  //                   </View>
-  //                 ))
-  //               )}
-  //             </View>
-  //           </View>
-  //         </ScrollView>
-  //       </PinchGestureHandler>
-  //     </GestureHandlerRootView>
-  //   );
-  // };
-
   const renderModalContent = () => {
     if (!selectedPatient) return null;
     if (modalLoading)
@@ -358,7 +296,9 @@ export default function PatientsScreen() {
         />
       );
 
-    const radiologyURL = `http://103.140.31.132:8080/chk/oviyam?patientID=${selectedPatient.PATIENT_ID}`;
+    const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } =
+      Dimensions.get("window");
+
     const injectedJS = `
       (function() {
         var meta = document.createElement('meta');
@@ -386,6 +326,7 @@ export default function PatientsScreen() {
           </Text>
         </View>
 
+        {/* Tabs Inside Modal */}
         <View style={styles.tabRow}>
           {TABS.map((tab) => (
             <TouchableOpacity
@@ -402,13 +343,16 @@ export default function PatientsScreen() {
                 {tab === "notes"
                   ? "Notes"
                   : tab === "lab"
-                    ? "Lab Reports"
-                    : "Radiology"}
+                    ? "Lab"
+                    : tab === "radiology"
+                      ? "Radiology"
+                      : "Pharmacy"}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
+        {/* Tab Content */}
         <View style={{ marginTop: 12 }}>
           {activeTab === "notes" &&
             (notes.length ? (
@@ -478,29 +422,6 @@ export default function PatientsScreen() {
 
           {activeTab === "radiology" && selectedPatient && (
             <View style={{ height: SCREEN_HEIGHT * 0.7 }}>
-              {/* Refresh Button */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "flex-end",
-                  marginBottom: 6,
-                }}
-              >
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: "#00A652",
-                    paddingVertical: 6,
-                    paddingHorizontal: 12,
-                    borderRadius: 8,
-                  }}
-                  onPress={() => webviewRef.current?.reload()}
-                >
-                  <Text style={{ color: "#fff", fontWeight: "600" }}>
-                    {loadingWeb ? "Loading..." : "< Back"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
               <WebView
                 ref={webviewRef}
                 source={{
@@ -516,6 +437,10 @@ export default function PatientsScreen() {
               />
             </View>
           )}
+
+          {activeTab === "pharmacy" && selectedPatient && (
+            <PharmacyTable patientId={String(selectedPatient.PATIENT_ID)} />
+          )}
         </View>
       </View>
     );
@@ -523,7 +448,7 @@ export default function PatientsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Branch/Ward Pickers */}
+      {/* Branch / Ward Pickers */}
       <View
         style={{
           flexDirection: "row",
@@ -581,6 +506,17 @@ export default function PatientsScreen() {
           keyExtractor={(item) => String(item.ADM_REQ_ID ?? item.PATIENT_ID)}
           renderItem={({ item }) => (
             <View style={styles.card}>
+              {/* 🔹 AI Icon - Top Right */}
+              <TouchableOpacity
+                style={styles.aiIcon}
+                onPress={() => {
+                  setAiPatientId(item.PATIENT_ID); // store patient ID
+                  setAiModalVisible(true); // open AI modal
+                }}
+              >
+                <Bot size={20} color="#00A652" />
+              </TouchableOpacity>
+
               <View
                 style={{
                   flexDirection: "row",
@@ -604,33 +540,27 @@ export default function PatientsScreen() {
                   </Text>
                 </View>
               </View>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                }}
-              >
-                <TouchableOpacity
-                  onPress={() => openModal(item, "notes")}
-                  style={styles.button}
-                >
-                  <Eye size={16} color="#fff" />
-                  <Text style={styles.buttonText}>Notes</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => openModal(item, "lab")}
-                  style={styles.button}
-                >
-                  <FileText size={16} color="#fff" />
-                  <Text style={styles.buttonText}>Lab Reports</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => openModal(item, "radiology")}
-                  style={styles.button}
-                >
-                  <FileText size={16} color="#fff" />
-                  <Text style={styles.buttonText}>Radiology</Text>
-                </TouchableOpacity>
+
+              {/* Existing Tabs */}
+              <View style={styles.tabContainer}>
+                {TABS.map((tab) => (
+                  <TouchableOpacity
+                    key={tab}
+                    onPress={() => openModal(item, tab)}
+                    style={styles.cardButton}
+                  >
+                    <FileText size={16} color="#fff" />
+                    <Text style={styles.buttonText}>
+                      {tab === "notes"
+                        ? "Notes"
+                        : tab === "lab"
+                          ? "Lab"
+                          : tab === "radiology"
+                            ? "Radiology"
+                            : "Pharmacy"}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
           )}
@@ -661,130 +591,139 @@ export default function PatientsScreen() {
               maxHeight: "85%",
             }}
           >
-            <ScrollView
-              nestedScrollEnabled
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator
-              contentContainerStyle={{
-                paddingBottom: activeTab === "notes" ? 120 : 40,
+            {/* ❌ Cross Button */}
+            <TouchableOpacity
+              onPress={closeModal}
+              style={{
+                position: "absolute",
+                top: 10,
+                right: 10,
+                zIndex: 999,
+                padding: 6,
               }}
             >
+              <Text style={{ fontSize: 20, color: "#999" }}>✕</Text>
+              {/* You can replace ✕ with an icon, e.g., from lucide-react-native */}
+              {/* <X size={22} color="#999" /> */}
+            </TouchableOpacity>
+
+            <ScrollView style={{ marginTop: 10 }}>
               {renderModalContent()}
             </ScrollView>
 
             {activeTab === "notes" && (
-              <View style={styles.inputWrapper}>
+              <View style={styles.messageBox}>
                 <TextInput
-                  style={[styles.input, { maxHeight: 100 }]}
-                  placeholder="Write a new note..."
+                  style={styles.messageInput}
+                  placeholder="Write note..."
                   value={messageText}
                   onChangeText={setMessageText}
-                  multiline
                 />
                 <TouchableOpacity
-                  style={styles.sendButton}
                   onPress={handleSend}
+                  style={styles.sendButton}
                 >
-                  <Send size={20} color="#fff" />
+                  <Send size={18} color="#fff" />
                 </TouchableOpacity>
               </View>
             )}
           </View>
         </Modal>
       </KeyboardAvoidingView>
+      <AIChatModal
+        visible={aiModalVisible}
+        onClose={() => setAiModalVisible(false)}
+        patientId={aiPatientId}
+      />
     </SafeAreaView>
   );
 }
 
-// Styles (unchanged)
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f3f4f6" },
+  container: { flex: 1, backgroundColor: "#f9f9f9" },
   searchInput: {
     backgroundColor: "#fff",
     margin: 12,
     borderRadius: 8,
     paddingHorizontal: 12,
-    height: 40,
-    borderWidth: 1,
+    paddingVertical: 8,
     borderColor: "#ccc",
+    borderWidth: 1,
   },
   card: {
     backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 12,
     marginHorizontal: 12,
     marginVertical: 6,
+    padding: 12,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 3,
   },
-  button: {
+  tabContainer: {
     flexDirection: "row",
-    backgroundColor: "#00A652",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    alignItems: "center",
-    marginHorizontal: 4,
+    justifyContent: "space-between",
+    marginTop: 8,
   },
-  buttonText: { color: "#fff", fontWeight: "600", marginLeft: 4 },
-  tabRow: { flexDirection: "row", marginBottom: 8 },
+  cardButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#00A652",
+    borderRadius: 8,
+    paddingVertical: 8,
+    marginHorizontal: 2,
+  },
+  buttonText: { color: "#fff", fontSize: 12, marginLeft: 4 },
+  tabRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginVertical: 8,
+  },
   tabButton: {
     flex: 1,
-    padding: 8,
-    borderWidth: 1,
-    borderColor: "#00A652",
+    marginHorizontal: 2,
+    paddingVertical: 8,
     borderRadius: 8,
-    marginHorizontal: 4,
+    backgroundColor: "#e5e5ea",
     alignItems: "center",
   },
-  tabActive: { backgroundColor: "#00A652" },
-  tabText: { color: "#00A652", fontWeight: "600" },
-  row: { flexDirection: "row", borderBottomWidth: 1, borderColor: "#ddd" },
-  headerRow: { backgroundColor: "#00A652", borderBottomWidth: 1 },
-  cell: {
-    paddingVertical: 6,
-    paddingHorizontal: 6,
-    fontSize: 12,
-    textAlign: "center",
-    color: "#000",
-    borderRightWidth: 1,
-    borderColor: "#ddd",
+  tabActive: {
+    backgroundColor: "#00A652",
   },
-  cellBox: {
-    justifyContent: "center",
-    alignItems: "center",
-    borderRightWidth: 1,
-    borderColor: "#ddd",
+  tabText: {
+    fontSize: 13,
+    color: "#333",
   },
-  headerCell: { fontWeight: "bold", fontSize: 12, color: "#fff" },
-  inputWrapper: {
-    color: "#000000ff",
+  messageBox: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderTopWidth: 1,
-    borderColor: "#ddd",
-    backgroundColor: "#f9f9f9",
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
+    marginTop: 8,
   },
-  input: {
+  messageInput: {
     flex: 1,
-    backgroundColor: "#fff",
     borderWidth: 1,
     borderColor: "#ccc",
-    borderRadius: 20,
-    paddingHorizontal: 12,
+    borderRadius: 8,
+    paddingHorizontal: 10,
     paddingVertical: 6,
+    backgroundColor: "#f5f5f5",
   },
   sendButton: {
-    marginLeft: 8,
     backgroundColor: "#00A652",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    padding: 10,
+    borderRadius: 8,
+    marginLeft: 6,
+  },
+  aiIcon: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 4,
+    elevation: 2,
   },
 });

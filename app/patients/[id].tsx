@@ -52,22 +52,30 @@ export default function PatientDetailScreen() {
   const { id } = useLocalSearchParams();
   const [patient, setPatient] = useState<PatientDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<"notes" | "lab" | "radiology">("notes");
+  const [activeTab, setActiveTab] = useState<"notes" | "lab" | "radiology">(
+    "notes"
+  );
   const [notes, setNotes] = useState<Note[]>([]);
   const [radiologyReports, setRadiologyReports] = useState<Radiology[]>([]);
-  const LOCAL_IP = "192.168.100.147";
+  const LOCAL_IP = "192.168.100.116";
 
   // 🔹 Fetch patient data
   useEffect(() => {
     const fetchPatientData = async () => {
       try {
-        const patientRes = await axios.get(`http://${LOCAL_IP}:3000/patients/${id}`);
+        const patientRes = await axios.get(
+          `http://${LOCAL_IP}:3000/patients/${id}`
+        );
         setPatient(patientRes.data);
 
-        const notesRes = await axios.get(`http://${LOCAL_IP}:3000/patients/${id}/notes`);
+        const notesRes = await axios.get(
+          `http://${LOCAL_IP}:3000/patients/${id}/notes`
+        );
         setNotes(notesRes.data);
 
-        const radRes = await axios.get(`http://${LOCAL_IP}:3000/patients/${id}/radiology`);
+        const radRes = await axios.get(
+          `http://${LOCAL_IP}:3000/patients/${id}/radiology`
+        );
         setRadiologyReports(radRes.data);
       } catch (err) {
         console.error("Error fetching patient details:", err);
@@ -81,7 +89,11 @@ export default function PatientDetailScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#00A652" style={{ marginTop: 50 }} />
+        <ActivityIndicator
+          size="large"
+          color="#00A652"
+          style={{ marginTop: 50 }}
+        />
       </SafeAreaView>
     );
   }
@@ -89,7 +101,9 @@ export default function PatientDetailScreen() {
   if (!patient) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text style={{ textAlign: "center", marginTop: 50 }}>Patient not found.</Text>
+        <Text style={{ textAlign: "center", marginTop: 50 }}>
+          Patient not found.
+        </Text>
       </SafeAreaView>
     );
   }
@@ -149,7 +163,11 @@ export default function PatientDetailScreen() {
                   activeTab === tab && { color: "#fff", fontWeight: "700" },
                 ]}
               >
-                {tab === "notes" ? "Notes" : tab === "lab" ? "Lab Reports" : "Radiology"}
+                {tab === "notes"
+                  ? "Notes"
+                  : tab === "lab"
+                    ? "Lab Reports"
+                    : "Radiology"}
               </Text>
             </TouchableOpacity>
           ))}
@@ -179,7 +197,9 @@ export default function PatientDetailScreen() {
             (radiologyReports.length > 0 ? (
               radiologyReports.map((rad) => (
                 <View key={rad.id} style={styles.card}>
-                  <Text style={{ fontWeight: "600" }}>PMR No: {rad.pmr_no}</Text>
+                  <Text style={{ fontWeight: "600" }}>
+                    PMR No: {rad.pmr_no}
+                  </Text>
                   <Text>Status: {rad.status}</Text>
                   <Text>X-Ray: {rad.xray_status}</Text>
                   <Text>CT: {rad.ct_status}</Text>

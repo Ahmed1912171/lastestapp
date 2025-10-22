@@ -24,197 +24,45 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import AIChatModal from "../../components/AIChatModal";
 import SimpleAvatar from "../../components/SimpleAvatar";
 import SimpleChart from "../../components/SimpleChart";
-// ----- Types -----
-type WardStats = {
-  occupied: number;
-  total: number;
-  currentPatients: number;
-  totalTreated: number;
-};
 
 type WardData = {
-  chartData: { name: string; patients: number }[];
-  stats: WardStats;
+  ward_id: number;
+  ward_name: string;
+  status: number;
 };
 
-type BranchWards = {
-  PICU: WardData;
-  NICU: WardData;
-  GP: WardData;
-};
+type BranchWards = Record<
+  string,
+  {
+    chartData: { name: string; patients: number }[];
+    stats: {
+      occupied: number;
+      total: number;
+      currentPatients: number;
+      totalTreated: number;
+    };
+  }
+>;
 
 type BranchData = Record<string, BranchWards>;
-
-// ---------- Branch Data ----------
-const branchData: BranchData = {
-  Korangi: {
-    PICU: {
-      chartData: [],
-      stats: { occupied: 0, total: 0, currentPatients: 0, totalTreated: 0 },
-    },
-    NICU: {
-      chartData: [],
-      stats: { occupied: 0, total: 0, currentPatients: 0, totalTreated: 0 },
-    },
-    GP: {
-      chartData: [],
-      stats: { occupied: 0, total: 0, currentPatients: 0, totalTreated: 0 },
-    },
-  },
-  Azambasti: {
-    PICU: {
-      chartData: [],
-      stats: {
-        occupied: 25,
-        total: 35,
-        currentPatients: 22,
-        totalTreated: 14,
-      },
-    },
-    NICU: {
-      chartData: [],
-      stats: { occupied: 18, total: 28, currentPatients: 15, totalTreated: 95 },
-    },
-    GP: {
-      chartData: [],
-      stats: {
-        occupied: 40,
-        total: 60,
-        currentPatients: 35,
-        totalTreated: 250,
-      },
-    },
-  },
-  Sobhraj: {
-    PICU: {
-      chartData: [],
-      stats: { occupied: 10, total: 20, currentPatients: 9, totalTreated: 80 },
-    },
-    NICU: {
-      chartData: [],
-      stats: { occupied: 12, total: 22, currentPatients: 10, totalTreated: 70 },
-    },
-    GP: {
-      chartData: [],
-      stats: {
-        occupied: 30,
-        total: 50,
-        currentPatients: 28,
-        totalTreated: 200,
-      },
-    },
-  },
-  Sukkur: {
-    PICU: {
-      chartData: [],
-      stats: { occupied: 5, total: 15, currentPatients: 4, totalTreated: 40 },
-    },
-    NICU: {
-      chartData: [],
-      stats: { occupied: 7, total: 17, currentPatients: 6, totalTreated: 45 },
-    },
-    GP: {
-      chartData: [],
-      stats: {
-        occupied: 20,
-        total: 40,
-        currentPatients: 18,
-        totalTreated: 150,
-      },
-    },
-  },
-  Larkana: {
-    PICU: {
-      chartData: [],
-      stats: { occupied: 8, total: 18, currentPatients: 7, totalTreated: 50 },
-    },
-    NICU: {
-      chartData: [],
-      stats: { occupied: 6, total: 16, currentPatients: 5, totalTreated: 45 },
-    },
-    GP: {
-      chartData: [],
-      stats: {
-        occupied: 25,
-        total: 45,
-        currentPatients: 22,
-        totalTreated: 170,
-      },
-    },
-  },
-  Hyderabad: {
-    PICU: {
-      chartData: [],
-      stats: { occupied: 12, total: 22, currentPatients: 11, totalTreated: 75 },
-    },
-    NICU: {
-      chartData: [],
-      stats: { occupied: 9, total: 19, currentPatients: 8, totalTreated: 60 },
-    },
-    GP: {
-      chartData: [],
-      stats: {
-        occupied: 35,
-        total: 55,
-        currentPatients: 32,
-        totalTreated: 220,
-      },
-    },
-  },
-  Nawabshah: {
-    PICU: {
-      chartData: [],
-      stats: { occupied: 14, total: 24, currentPatients: 12, totalTreated: 85 },
-    },
-    NICU: {
-      chartData: [],
-      stats: { occupied: 11, total: 21, currentPatients: 9, totalTreated: 70 },
-    },
-    GP: {
-      chartData: [],
-      stats: {
-        occupied: 28,
-        total: 48,
-        currentPatients: 25,
-        totalTreated: 190,
-      },
-    },
-  },
-};
-
-// ---------- Generate random weekly chart data ----------
-Object.keys(branchData).forEach((branch) => {
-  (Object.keys(branchData[branch]) as (keyof BranchWards)[]).forEach((ward) => {
-    branchData[branch][ward].chartData = [
-      { name: "Mon", patients: Math.floor(Math.random() * 50) },
-      { name: "Tue", patients: Math.floor(Math.random() * 50) },
-      { name: "Wed", patients: Math.floor(Math.random() * 50) },
-      { name: "Thu", patients: Math.floor(Math.random() * 50) },
-      { name: "Fri", patients: Math.floor(Math.random() * 50) },
-      { name: "Sat", patients: Math.floor(Math.random() * 50) },
-      { name: "Sun", patients: Math.floor(Math.random() * 50) },
-    ];
-  });
-});
 
 export default function Dashboard() {
   const [branchOpen, setBranchOpen] = useState(false);
   const [wardOpen, setWardOpen] = useState(false);
-  const [selectedBranch, setSelectedBranch] =
-    useState<keyof BranchData>("Korangi");
-  const [selectedWard, setSelectedWard] = useState<keyof BranchWards>("PICU");
-  const [wards, setWards] = useState<
-    { label: string; value: keyof BranchWards }[]
-  >([]);
+  const [selectedBranch, setSelectedBranch] = useState<string>("");
+  const [selectedWard, setSelectedWard] = useState<string>("");
+  const [branches, setBranches] = useState<string[]>([]);
+  const [wards, setWards] = useState<string[]>([]);
+  const [branchData, setBranchData] = useState<BranchData>({});
   const [refreshing, setRefreshing] = useState(false);
   const [today, setToday] = useState("");
   const [showAI, setShowAI] = useState(false);
 
-  const LOCAL_IP = "192.168.100.116";
-
-  // ---------- New state for Total Tests ----------
+  // ✅ Total Tests state
   const [testCount, setTestCount] = useState<number | null>(null);
-  const [loadingCount, setLoadingCount] = useState<boolean>(false);
+  const [loadingCount, setLoadingCount] = useState(false);
+
+  const LOCAL_IP = "192.168.100.116";
 
   // ---------- Dynamic Date ----------
   useEffect(() => {
@@ -228,165 +76,157 @@ export default function Dashboard() {
     setToday(date.toLocaleDateString("en-US", options));
   }, []);
 
-  // ---------- Fetch Total Tests Count with robust fallback ----------
+  // ---------- Fetch Total Tests ----------
   const fetchTestCount = useCallback(async () => {
     setLoadingCount(true);
     try {
-      // Try multiple endpoints to work across emulator/simulator/device
-      const candidates = [
-        // android emulator
+      const urls = [
         "http://10.0.2.2:3000/tr_newris_request/count",
-        // iOS simulator (localhost)
         "http://localhost:3000/tr_newris_request/count",
-        // LAN IP (your machine)
         `http://${LOCAL_IP}:3000/tr_newris_request/count`,
       ];
 
-      let resultCount: number | null = null;
-      for (const url of candidates) {
+      let count: number | null = null;
+
+      for (const url of urls) {
         try {
           const res = await axios.get(url, { timeout: 4000 });
-          if (res && res.status === 200) {
-            // API might return { count: number } or just a number
+          if (res.status === 200) {
             const data = res.data;
-            if (data == null) {
-              // skip if empty
-              continue;
-            }
+
+            // Direct number
             if (typeof data === "number") {
-              resultCount = data;
+              count = data;
               break;
             }
+
+            // Existing 'count' field
             if (typeof data.count === "number") {
-              resultCount = data.count;
+              count = data.count;
               break;
             }
-            // If API returns object with other structure, try to find numeric field
-            const numericField = Object.values(data).find(
-              (v) => typeof v === "number"
-            );
-            if (typeof numericField === "number") {
-              resultCount = numericField;
+
+            // ✅ New: check 'total_count'
+            if (typeof data.total_count === "number") {
+              count = data.total_count;
               break;
             }
           }
-        } catch (err) {
-          // try next candidate silently
-          // console.warn("count fetch failed for", url, err);
-        }
+        } catch {}
       }
 
-      if (resultCount === null) {
-        // final attempt using the LAN ip without path troubleshooting
-        try {
-          const res = await axios.get(
-            `http://${LOCAL_IP}:3000/tr_newris_request/count`
-          );
-          const data = res.data;
-          if (typeof data === "number") resultCount = data;
-          else if (typeof data.count === "number") resultCount = data.count;
-        } catch (err) {
-          // nothing
-        }
-      }
-
-      setTestCount(resultCount ?? 0);
-    } catch (err) {
-      console.error("Error fetching test count:", err);
+      setTestCount(count ?? 0);
+    } catch {
       setTestCount(0);
     } finally {
       setLoadingCount(false);
     }
   }, [LOCAL_IP]);
 
-  // ---------- Fetch Korangi Data ----------
-  const fetchKorangiData = useCallback(async () => {
+  // ---------- Fetch Branches ----------
+  const fetchBranches = useCallback(async () => {
     try {
-      const res = await axios.get(`http://${LOCAL_IP}:3000/ward_beds`);
-      const data: { ward: string; status: number }[] = res.data;
-
-      const newKorangi: BranchWards = {
-        PICU: {
-          chartData: branchData.Korangi.PICU.chartData,
-          stats: {
-            occupied: 0,
-            total: 0,
-            currentPatients: 0,
-            totalTreated: branchData.Korangi.PICU.stats.totalTreated,
-          },
-        },
-        NICU: {
-          chartData: branchData.Korangi.NICU.chartData,
-          stats: {
-            occupied: 0,
-            total: 0,
-            currentPatients: 0,
-            totalTreated: branchData.Korangi.NICU.stats.totalTreated,
-          },
-        },
-        GP: {
-          chartData: branchData.Korangi.GP.chartData,
-          stats: {
-            occupied: 0,
-            total: 0,
-            currentPatients: 0,
-            totalTreated: branchData.Korangi.GP.stats.totalTreated,
-          },
-        },
-      };
-
-      data.forEach((bed) => {
-        if (bed.ward === "PICU") {
-          newKorangi.PICU.stats.total++;
-          newKorangi.PICU.stats.occupied += bed.status;
-        } else if (bed.ward === "NICU") {
-          newKorangi.NICU.stats.total++;
-          newKorangi.NICU.stats.occupied += bed.status;
-        } else if (bed.ward === "GP") {
-          newKorangi.GP.stats.total++;
-          newKorangi.GP.stats.occupied += bed.status;
-        }
-      });
-
-      (["PICU", "NICU", "GP"] as (keyof BranchWards)[]).forEach((w) => {
-        newKorangi[w].stats.currentPatients = newKorangi[w].stats.occupied;
-        newKorangi[w].stats.totalTreated += newKorangi[w].stats.currentPatients;
-      });
-
-      branchData.Korangi = newKorangi;
+      const branchList = [
+        "Korangi",
+        "Azambasti",
+        "Sobhraj",
+        "Sukkur",
+        "Larkana",
+        "Hyderabad",
+        "Nawabshah",
+      ];
+      setBranches(branchList);
+      setSelectedBranch(branchList[0]);
     } catch (err) {
-      console.error("Error fetching ward beds", err);
+      console.error("Error fetching branches", err);
     }
-  }, [LOCAL_IP]);
+  }, []);
+
+  // ---------- Fetch Wards ----------
+  const fetchWards = useCallback(
+    async (branch: string) => {
+      try {
+        const res = await axios.get(
+          `http://${LOCAL_IP}:3000/ward_beds?branch=${branch}`
+        );
+        const data: WardData[] = res.data;
+
+        const newBranchWards: BranchWards = {};
+
+        const generateChartData = () => [
+          { name: "Mon", patients: Math.floor(Math.random() * 50) },
+          { name: "Tue", patients: Math.floor(Math.random() * 50) },
+          { name: "Wed", patients: Math.floor(Math.random() * 50) },
+          { name: "Thu", patients: Math.floor(Math.random() * 50) },
+          { name: "Fri", patients: Math.floor(Math.random() * 50) },
+          { name: "Sat", patients: Math.floor(Math.random() * 50) },
+          { name: "Sun", patients: Math.floor(Math.random() * 50) },
+        ];
+
+        data.forEach((ward) => {
+          if (!newBranchWards[ward.ward_name]) {
+            newBranchWards[ward.ward_name] = {
+              chartData: generateChartData(),
+              stats: {
+                total: 0,
+                occupied: 0,
+                currentPatients: 0,
+                totalTreated: 0,
+              },
+            };
+          }
+
+          newBranchWards[ward.ward_name].stats.total += 1;
+          if (ward.status === 1) {
+            newBranchWards[ward.ward_name].stats.occupied += 1;
+            newBranchWards[ward.ward_name].stats.currentPatients += 1;
+          }
+        });
+
+        Object.keys(newBranchWards).forEach((w) => {
+          newBranchWards[w].stats.totalTreated =
+            newBranchWards[w].stats.currentPatients;
+        });
+
+        setBranchData((prev) => ({ ...prev, [branch]: newBranchWards }));
+
+        const wardNames = Object.keys(newBranchWards);
+        setWards(wardNames);
+        setSelectedWard(wardNames[0] || "");
+      } catch (err) {
+        console.error("Error fetching wards", err);
+      }
+    },
+    [LOCAL_IP]
+  );
 
   // ---------- Refresh ----------
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    Promise.all([fetchKorangiData(), fetchTestCount()]).finally(() =>
+    Promise.all([fetchBranches(), fetchTestCount()]).finally(() =>
       setRefreshing(false)
     );
-  }, [fetchKorangiData, fetchTestCount]);
+  }, [fetchBranches, fetchTestCount]);
 
-  // ---------- Update Wards Dropdown ----------
+  // ---------- Update Wards when Branch changes ----------
   useEffect(() => {
-    const wardNames = (
-      Object.keys(branchData[selectedBranch]) as (keyof BranchWards)[]
-    ).map((w) => ({ label: w, value: w }));
-    setWards(wardNames);
-    if (!wardNames.find((w) => w.value === selectedWard)) {
-      setSelectedWard(wardNames[0].value);
+    if (selectedBranch) {
+      setSelectedWard("");
+      fetchWards(selectedBranch);
     }
-  }, [selectedBranch, selectedWard]);
+  }, [selectedBranch, fetchWards]);
 
+  // ---------- Initial load ----------
   useEffect(() => {
-    // initial load
-    fetchKorangiData();
+    fetchBranches();
     fetchTestCount();
-  }, [fetchKorangiData, fetchTestCount]);
+  }, [fetchBranches, fetchTestCount]);
 
-  const wardData = branchData[selectedBranch][selectedWard];
+  const wardData = branchData[selectedBranch]?.[selectedWard] || {
+    chartData: [],
+    stats: { occupied: 0, total: 0, currentPatients: 0, totalTreated: 0 },
+  };
 
-  // ---------- DropDown helpers ----------
   const setBranchValue = (val: any) => {
     const v = typeof val === "function" ? val(selectedBranch) : val;
     setSelectedBranch(v);
@@ -406,7 +246,6 @@ export default function Dashboard() {
         }
         keyboardShouldPersistTaps="handled"
       >
-        {/* Header */}
         <View style={styles.header}>
           <View>
             <Text style={styles.hello}>Hello, Dr. Ahmed Hasan</Text>
@@ -415,15 +254,11 @@ export default function Dashboard() {
           <SimpleAvatar fallback="AH" size={48} />
         </View>
 
-        {/* 🤖 Floating AI Chat Button */}
         <TouchableOpacity style={styles.fab} onPress={() => setShowAI(true)}>
           <Ionicons name="chatbubble-ellipses-outline" size={28} color="#fff" />
         </TouchableOpacity>
-
-        {/* 💬 AI Chat Modal */}
         <AIChatModal visible={showAI} onClose={() => setShowAI(false)} />
 
-        {/* Dropdowns */}
         <View style={styles.filters}>
           <View style={[styles.dropdownContainer, { zIndex: 6000 }]}>
             <Text style={styles.dropdownLabel}>Branch</Text>
@@ -432,10 +267,7 @@ export default function Dashboard() {
               setOpen={setBranchOpen}
               value={selectedBranch}
               setValue={setBranchValue}
-              items={Object.keys(branchData).map((b) => ({
-                label: b,
-                value: b,
-              }))}
+              items={branches.map((b) => ({ label: b, value: b }))}
               listMode="SCROLLVIEW"
               dropDownDirection="AUTO"
               zIndex={6000}
@@ -450,7 +282,7 @@ export default function Dashboard() {
               setOpen={setWardOpen}
               value={selectedWard}
               setValue={setWardValue}
-              items={wards as any}
+              items={wards.map((w) => ({ label: w, value: w }))}
               listMode="SCROLLVIEW"
               dropDownDirection="AUTO"
               zIndex={5000}
@@ -459,17 +291,30 @@ export default function Dashboard() {
           </View>
         </View>
 
-        {/* Chart */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <TrendingUp size={16} />
             <Text style={styles.cardTitle}> Patients Visited (This Week)</Text>
           </View>
-          <SimpleChart data={wardData.chartData} />
+
+          {wardData.chartData.length > 0 ? (
+            <SimpleChart data={wardData.chartData} />
+          ) : (
+            <View
+              style={{
+                height: 200,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <ActivityIndicator size="large" color="#00A652" />
+            </View>
+          )}
         </View>
 
         {/* Stats */}
         <View style={styles.statsGrid}>
+          {/* Branch */}
           <View style={styles.statCard}>
             <View style={styles.statRow}>
               <View style={styles.iconWrapper}>
@@ -482,18 +327,22 @@ export default function Dashboard() {
             </View>
           </View>
 
+          {/* Ward */}
           <View style={styles.statCard}>
             <View style={styles.statRow}>
               <View style={styles.iconWrapper}>
                 <Users size={20} />
               </View>
-              <View>
+              <View style={{ flex: 1, flexShrink: 1 }}>
                 <Text style={styles.statLabel}>Ward</Text>
-                <Text style={styles.statValue}>{selectedWard}</Text>
+                <Text style={[styles.statValue, { flexWrap: "wrap" }]}>
+                  {selectedWard}
+                </Text>
               </View>
             </View>
           </View>
 
+          {/* Occupied */}
           <View style={styles.statCard}>
             <View style={styles.statRow}>
               <View style={styles.iconWrapper}>
@@ -508,6 +357,7 @@ export default function Dashboard() {
             </View>
           </View>
 
+          {/* Available */}
           <View style={styles.statCard}>
             <View style={styles.statRow}>
               <View
@@ -524,6 +374,7 @@ export default function Dashboard() {
             </View>
           </View>
 
+          {/* Current Patients */}
           <View style={styles.statCard}>
             <View style={styles.statRow}>
               <View
@@ -540,6 +391,7 @@ export default function Dashboard() {
             </View>
           </View>
 
+          {/* Total Treated */}
           <View style={styles.statCard}>
             <View style={styles.statRow}>
               <View
@@ -556,6 +408,7 @@ export default function Dashboard() {
             </View>
           </View>
 
+          {/* Total Tests */}
           <View style={styles.statCard}>
             <View style={styles.statRow}>
               <View
@@ -595,31 +448,28 @@ const styles = StyleSheet.create({
   hello: { fontSize: 24, fontWeight: "700" },
   date: { color: "#666" },
 
-  // 👇 FIXED HERE
   filters: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 16,
     position: "relative",
-    zIndex: 9999, // ensures dropdowns are always on top on web
+    zIndex: 9999,
   },
 
   dropdownContainer: {
     flex: 1,
     marginRight: 8,
     position: "relative",
-    zIndex: 9999, // higher stacking order for web
+    zIndex: 9999,
   },
 
   dropdownLabel: { marginBottom: 4, fontWeight: "600" },
 
-  // 👇 FIXED HERE — removed overflow: 'hidden'
   card: {
     backgroundColor: "#fff",
     borderRadius: 10,
     padding: 12,
     marginBottom: 16,
-    // overflow: 'hidden', ❌ remove this line, it clips dropdowns
   },
 
   cardHeader: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
@@ -654,10 +504,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 5,
-  },
-  fabText: {
-    fontSize: 26,
-    color: "#fff",
   },
 
   statRow: { flexDirection: "row", alignItems: "center" },

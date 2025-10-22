@@ -24,7 +24,6 @@ type Patient = {
   PATIENT_FNAME: string;
 };
 
-
 export default function SearchScreen() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -33,26 +32,29 @@ export default function SearchScreen() {
   const [page, setPage] = useState<number>(1);
 
   // 🔹 Fetch results from backend
-  const fetchResults = useCallback(async (query: string, pageNumber: number = 1) => {
-    if (!query) {
-      setPatients([]);
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await axios.get<Patient[]>(
-        "http://192.168.100.147:3000/search",
-        { params: { query, page: pageNumber, limit: 50 } }
-      );
+  const fetchResults = useCallback(
+    async (query: string, pageNumber: number = 1) => {
+      if (!query) {
+        setPatients([]);
+        return;
+      }
+      setLoading(true);
+      try {
+        const res = await axios.get<Patient[]>(
+          "http://192.168.100.116:3000/search",
+          { params: { query, page: pageNumber, limit: 50 } }
+        );
 
-      if (pageNumber === 1) setPatients(res.data);
-      else setPatients(prev => [...prev, ...res.data]);
-    } catch (err) {
-      console.error("Axios Error:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+        if (pageNumber === 1) setPatients(res.data);
+        else setPatients((prev) => [...prev, ...res.data]);
+      } catch (err) {
+        console.error("Axios Error:", err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   // 🔹 Debounced search
   const debouncedSearch = useCallback(() => {
@@ -82,15 +84,15 @@ export default function SearchScreen() {
 
   const renderPatient = ({ item }: { item: Patient }) => (
     <TouchableOpacity
-  style={styles.card}
-  onPress={() => {
-    if (item.PATIENT_ID === null) return; // skip navigation if ID is null
-    router.push({
-      pathname: "/patients/[id]",
-      params: { id: item.PATIENT_ID, ...item },
-    });
-  }}
->
+      style={styles.card}
+      onPress={() => {
+        if (item.PATIENT_ID === null) return; // skip navigation if ID is null
+        router.push({
+          pathname: "/patients/[id]",
+          params: { id: item.PATIENT_ID, ...item },
+        });
+      }}
+    >
       <View style={styles.cardHeader}>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           <Image
@@ -139,17 +141,27 @@ export default function SearchScreen() {
         </View>
       </View>
 
-      {loading && <ActivityIndicator size="large" color="#0000ff" style={{ marginTop: 10 }} />}
+      {loading && (
+        <ActivityIndicator
+          size="large"
+          color="#0000ff"
+          style={{ marginTop: 10 }}
+        />
+      )}
 
       <FlatList
         data={patients}
-        keyExtractor={(item) => item.PATIENT_ID?.toString() || Math.random().toString()}
+        keyExtractor={(item) =>
+          item.PATIENT_ID?.toString() || Math.random().toString()
+        }
         renderItem={renderPatient}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         contentContainerStyle={{ paddingBottom: 100 }}
         ListEmptyComponent={
-          !loading ? <Text style={styles.noResults}>No results found</Text> : null
+          !loading ? (
+            <Text style={styles.noResults}>No results found</Text>
+          ) : null
         }
       />
     </SafeAreaView>
@@ -192,5 +204,10 @@ const styles = StyleSheet.create({
   },
   stable: { backgroundColor: "#bbf7d0", color: "#00A652" },
   critical: { backgroundColor: "#fecaca", color: "#991b1b" },
-  noResults: { textAlign: "center", marginTop: 20, fontSize: 16, color: "#999" },
+  noResults: {
+    textAlign: "center",
+    marginTop: 20,
+    fontSize: 16,
+    color: "#999",
+  },
 });

@@ -480,6 +480,94 @@ Provide a professional medical analysis.`,
   })
 );
 
+app.get(
+  "/tr_pharmacy_store_request",
+  safeHandler(async (req, res) => {
+    const patientId = req.query.patientId;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = (page - 1) * limit;
+
+    // ✅ Validate input
+    if (!patientId) {
+      return res.status(400).json({ error: "Missing patientId" });
+    }
+
+    // ✅ Proper JOIN to get medicine name
+    const [results] = await db.query(
+      `
+  SELECT 
+    tpsr.*, 
+    tsic.SUB_ITEM_CAT AS medicine_name,
+    CAST(tpsr.stop_medicine AS UNSIGNED) AS stop_medicine
+  FROM tr_pharmacy_store_request tpsr
+  LEFT JOIN tr_sub_item_categ tsic 
+    ON tpsr.SUB_ITEM_CAT_ID = tsic.SUB_ITEM_CAT_ID
+  WHERE tpsr.PATIENT_ID = ?
+  ORDER BY tpsr.QUAN_ID DESC
+  LIMIT ? OFFSET ?
+  `,
+      [patientId, limit, offset]
+    );
+
+    res.json(results);
+  })
+);
+
+////////////// MEDICINE NAME
+app.get(
+  "/medicines",
+  safeHandler(async (req, res) => {
+    const search = req.query.search || "";
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = (page - 1) * limit;
+
+    // ✅ Query base
+    let sql = `
+      SELECT SUB_ITEM_CAT_ID, SUB_ITEM_CAT
+      FROM tr_sub_item_categ
+      WHERE SUB_ITEM_CAT_ID > 100001
+        AND SUB_CAT_ID = 2
+    `;
+    const params = [];
+
+    // 🔍 Search by medicine name
+    if (search) {
+      sql += " AND SUB_ITEM_CAT LIKE ?";
+      params.push(`%${search}%`);
+    }
+
+    // ✅ Add ordering + pagination
+    sql += " ORDER BY SUB_ITEM_CAT ASC LIMIT ? OFFSET ?";
+    params.push(limit, offset);
+
+    // Execute query
+    const [results] = await db.query(sql, params);
+
+    // ✅ Get total count for pagination
+    const [[{ total }]] = await db.query(
+      `
+      SELECT COUNT(*) AS total
+      FROM tr_sub_item_categ
+      WHERE SUB_ITEM_CAT_ID > 100001
+        AND SUB_CAT_ID = 2
+        ${search ? "AND SUB_ITEM_CAT LIKE ?" : ""}
+      `,
+      search ? [`%${search}%`] : []
+    );
+
+    // ✅ Respond
+    res.json({
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      results,
+    });
+  })
+);
+
 // ==========================
 // ✅ GLOBAL ERROR HANDLER
 // ==========================

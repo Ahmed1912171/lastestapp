@@ -25,25 +25,60 @@ console.log(
 );
 
 // ==========================
-// ✅ MYSQL CONNECTION
+// ✅ BRANCH -> DATABASE MAP
 // ==========================
-let db;
-async function initDb() {
+const branchDBMap = {
+  ho: "convert_april_HO",
+  azambasti: "convert_april_azambasti",
+  chs: "convert_april_chs",
+  jamshoro: "convert_april_jamshoro",
+  korangi: "convert_april_k5",
+  larkana: "convert_april_larkana",
+  sba: "convert_april_sba",
+  sobhraj: "convert_april_sobhraj",
+};
+
+// ==========================
+// ✅ DB CONNECTION CACHE + GETTER
+// ==========================
+const dbConnections = {};
+
+async function getDb(branch) {
+  const dbKey = (branch || "korangi").toString().toLowerCase();
+  const dbName = branchDBMap[dbKey] || branchDBMap["korangi"];
+
+  if (dbConnections[dbName]) {
+    try {
+      // quick ping to validate connection
+      await dbConnections[dbName].query("SELECT 1");
+      return dbConnections[dbName];
+    } catch (err) {
+      // connection might be stale - close and reconnect
+      try {
+        await dbConnections[dbName].end();
+      } catch (e) {
+        /* ignore */
+      }
+      delete dbConnections[dbName];
+    }
+  }
+
   try {
-    db = await mysql.createConnection({
+    const connection = await mysql.createConnection({
       host: "192.168.1.130",
       user: "labintegration",
       password: "chkefro",
-      database: "convert_april_k5",
+      database: dbName,
       connectTimeout: 10000,
     });
-    console.log("✅ Connected to MySQL");
+    dbConnections[dbName] = connection;
+    console.log(`✅ Connected to MySQL database: ${dbName}`);
+    return connection;
   } catch (err) {
-    console.error("❌ DB Connection Failed:", err.message);
-    process.exit(1);
+    console.error(`❌ DB Connection Failed for ${dbName}:`, err.message);
+    throw err;
   }
 }
-await initDb();
 
 // ==========================
 // ✅ OPENAI INIT
@@ -86,6 +121,9 @@ app.get(
 app.get(
   "/admin",
   safeHandler(async (req, res) => {
+    // default branch korangi (or pass branch via query to check other DBs)
+    const branch = req.query.branch || "korangi";
+    const db = await getDb(branch);
     const [results] = await db.query(
       "SELECT ADMIN_ID, GR_EMPLOYER_LOGIN FROM admin"
     );
@@ -96,6 +134,9 @@ app.get(
 app.post(
   "/login",
   safeHandler(async (req, res) => {
+    const branch = req.body.branch || req.query.branch || "korangi";
+    const db = await getDb(branch);
+
     const { username, password } = req.body;
     if (!username || !password)
       return res.status(400).json({ error: "Missing credentials" });
@@ -116,6 +157,9 @@ app.post(
 app.get(
   "/search",
   safeHandler(async (req, res) => {
+    const branch = req.query.branch || "korangi";
+    const db = await getDb(branch);
+
     const query = req.query.query;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
@@ -144,8 +188,11 @@ app.get(
     const limit = parseInt(req.query.limit) || 10;
     const search = req.query.search || "";
     const ward = req.query.ward || "";
-    const branch = req.query.branch || "";
+    const branch = req.query.branch || "korangi";
     const offset = (page - 1) * limit;
+
+    // 🔹 Get correct DB for the branch
+    const db = await getDb(branch);
 
     let sql = `
     SELECT ar.*, pr.PATIENT_ID, pr.PATIENT_FNAME, pr.PATIENT_LNAME,
@@ -160,16 +207,24 @@ app.get(
     const params = [];
 
     if (search) {
-      sql +=
-        " AND (pr.PATIENT_FNAME LIKE ? OR pr.PATIENT_LNAME LIKE ? OR pr.PMR_NO LIKE ? OR pr.PATIENT_ID LIKE ?)";
+      // Search by first name, last name, PMR number, patient ID, or ward name
+      whereParts.push(`
+    (
+      pr.PATIENT_FNAME LIKE ?
+      OR pr.PATIENT_LNAME LIKE ?
+      OR pr.PMR_NO LIKE ?
+      OR pr.PATIENT_ID LIKE ?
+      OR w.WARD_NAME LIKE ?
+    )
+  `);
       const term = `%${search}%`;
-      params.push(term, term, term, term);
+      paramsCount.push(term, term, term, term, term);
     }
+
     if (ward) {
       sql += " AND ar.WARD_ID = ?";
       params.push(ward);
     }
-    if (branch && branch.toLowerCase() !== "korangi") return res.json([]);
 
     sql += " ORDER BY pr.PATIENT_ID DESC LIMIT ? OFFSET ?";
     params.push(limit, offset);
@@ -182,6 +237,9 @@ app.get(
 app.get(
   "/patients/:id",
   safeHandler(async (req, res) => {
+    const branch = req.query.branch || "korangi";
+    const db = await getDb(branch);
+
     const [results] = await db.query(
       "SELECT PATIENT_ID, PATIENT_FNAME, GENDER, DISTRICT, DOB, MOBILE_NO, TIMESTAMPDIFF(YEAR, DOB, CURDATE()) AS AGE FROM prg_patient_reg WHERE PATIENT_ID = ?",
       [req.params.id]
@@ -198,6 +256,9 @@ app.get(
 app.get(
   "/patients/:id/notes",
   safeHandler(async (req, res) => {
+    const branch = req.query.branch || "korangi";
+    const db = await getDb(branch);
+
     const [results] = await db.query(
       `SELECT Loc_ID, PATIENT_ID, COALESCE(LocalExamination, '') AS LocalExamination,
             DATE_FORMAT(loc_ex_date, '%Y-%m-%d %H:%i:%s') AS loc_ex_date,
@@ -214,6 +275,9 @@ app.get(
 app.post(
   "/patients/:id/notes",
   safeHandler(async (req, res) => {
+    const branch = req.body.branch || req.query.branch || "korangi";
+    const db = await getDb(branch);
+
     const { LocalExamination } = req.body;
     if (!LocalExamination)
       return res.status(400).json({ error: "LocalExamination required" });
@@ -232,6 +296,9 @@ app.post(
 app.get(
   "/patients/:id/lab",
   safeHandler(async (req, res) => {
+    const branch = req.query.branch || "korangi";
+    const db = await getDb(branch);
+
     const [results] = await db.query(
       `
       SELECT 
@@ -286,6 +353,9 @@ app.get(
 app.get(
   "/patients/:id/radiology",
   safeHandler(async (req, res) => {
+    const branch = req.query.branch || "korangi";
+    const db = await getDb(branch);
+
     const [results] = await db.query(
       `SELECT id, pmr_no, status, xray_status, ct_status, request_time,
             Priority AS priority, \`mod\` AS modality, mod_type, mod_region, short_history
@@ -324,6 +394,9 @@ app.post(
 app.post(
   "/analyze-lab",
   safeHandler(async (req, res) => {
+    const branch = req.body.branch || req.query.branch || "korangi";
+    const db = await getDb(branch);
+
     const { patientId } = req.body;
     if (!patientId)
       return res.status(400).json({ error: "patientId required" });
@@ -364,36 +437,69 @@ app.post(
 // ==========================
 // 🔹 WARD BEDS + COUNT
 // ==========================
+
 app.get(
   "/ward_beds",
   safeHandler(async (req, res) => {
-    const [results] = await db.query(
-      "SELECT WARD_ID, WD_OCC_STATUS FROM ward_beds WHERE WARD_ID IN (921,1116,1119)"
+    // 1️⃣ Branch (default korangi)
+    const branch = req.query.branch || "korangi";
+    const db = await getDb(branch);
+
+    // 2️⃣ Get all wards that should appear in the mobile app
+    const [wards] = await db.query(
+      `SELECT WARD_ID, WARD_NAME 
+       FROM ward 
+       WHERE mobile_app = 1`
     );
-    const wardMapping = { 921: "PICU", 1116: "NICU", 1119: "GP" };
-    res.json(
-      results.map((r) => ({
-        ward: wardMapping[r.WARD_ID] || r.WARD_ID,
-        status: r.WD_OCC_STATUS,
-      }))
+
+    if (wards.length === 0) {
+      return res.json([]); // no wards found
+    }
+
+    // 3️⃣ Get occupancy for those wards
+    const wardIds = wards.map((w) => w.WARD_ID);
+    const [beds] = await db.query(
+      `SELECT WARD_ID, WD_OCC_STATUS 
+       FROM ward_beds 
+       WHERE WARD_ID IN (${wardIds.join(",")})`
     );
+
+    // 4️⃣ Merge data: attach bed statuses to ward names
+    const data = beds.map((b) => {
+      const ward = wards.find((w) => w.WARD_ID === b.WARD_ID);
+      return {
+        ward_id: b.WARD_ID,
+        ward_name: ward ? ward.WARD_NAME : "Unknown",
+        status: b.WD_OCC_STATUS,
+      };
+    });
+
+    // 5️⃣ Return final JSON
+    res.json(data);
   })
 );
 
 app.get(
   "/tr_newris_request/count",
   safeHandler(async (req, res) => {
+    const branch = req.query.branch || "korangi";
+    const db = await getDb(branch);
+
     const [results] = await db.query(
       "SELECT COUNT(*) AS total_count FROM tr_newris_request"
     );
     res.json(results[0]);
   })
 );
+
 /////////////// AI Analysis
 
 app.get(
   "/patients/:id/full-analysis",
   safeHandler(async (req, res) => {
+    const branch = req.query.branch || "korangi";
+    const db = await getDb(branch);
+
     const patientId = req.params.id;
 
     // 1️⃣ Fetch patient demographics
@@ -480,6 +586,167 @@ Provide a professional medical analysis.`,
   })
 );
 
+//===============================
+// PHARMACY
+//===============================
+
+app.get(
+  "/tr_pharmacy_store_request",
+  safeHandler(async (req, res) => {
+    const branch = req.query.branch || "korangi";
+    const db = await getDb(branch);
+
+    const patientId = req.query.patientId;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = (page - 1) * limit;
+
+    // ✅ Validate input
+    if (!patientId) {
+      return res.status(400).json({ error: "Missing patientId" });
+    }
+
+    // ✅ Proper JOIN to get medicine name
+    const [results] = await db.query(
+      `
+  SELECT 
+    tpsr.*, 
+    tsic.SUB_ITEM_CAT AS medicine_name,
+    CAST(tpsr.stop_medicine AS UNSIGNED) AS stop_medicine
+  FROM tr_pharmacy_store_request tpsr
+  LEFT JOIN tr_sub_item_categ tsic 
+    ON tpsr.SUB_ITEM_CAT_ID = tsic.SUB_ITEM_CAT_ID
+  WHERE tpsr.PATIENT_ID = ?
+  ORDER BY tpsr.QUAN_ID DESC
+  LIMIT ? OFFSET ?
+  `,
+      [patientId, limit, offset]
+    );
+
+    res.json(results);
+  })
+);
+
+////////////// MEDICINE NAME
+app.get(
+  "/medicines",
+  safeHandler(async (req, res) => {
+    const branch = req.query.branch || "korangi";
+    const db = await getDb(branch);
+
+    const search = req.query.search || "";
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = (page - 1) * limit;
+
+    // ✅ Query base
+    let sql = `
+      SELECT SUB_ITEM_CAT_ID, SUB_ITEM_CAT
+      FROM tr_sub_item_categ
+      WHERE SUB_ITEM_CAT_ID > 100001
+        AND SUB_CAT_ID = 2
+    `;
+    const params = [];
+
+    // 🔍 Search by medicine name
+    if (search) {
+      sql += " AND SUB_ITEM_CAT LIKE ?";
+      params.push(`%${search}%`);
+    }
+
+    // ✅ Add ordering + pagination
+    sql += " ORDER BY SUB_ITEM_CAT ASC LIMIT ? OFFSET ?";
+    params.push(limit, offset);
+
+    // Execute query
+    const [results] = await db.query(sql, params);
+
+    // ✅ Get total count for pagination
+    const [[{ total }]] = await db.query(
+      `
+      SELECT COUNT(*) AS total
+      FROM tr_sub_item_categ
+      WHERE SUB_ITEM_CAT_ID > 100001
+        AND SUB_CAT_ID = 2
+        ${search ? "AND SUB_ITEM_CAT LIKE ?" : ""}
+      `,
+      search ? [`%${search}%`] : []
+    );
+
+    // ✅ Respond
+    res.json({
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      results,
+    });
+  })
+);
+
+// ==========================
+// ✅ OPTIONAL: CHECK ALL DBS HEALTH
+// ==========================
+app.get(
+  "/check-dbs",
+  safeHandler(async (req, res) => {
+    const results = [];
+    for (const [key, dbName] of Object.entries(branchDBMap)) {
+      try {
+        const db = await getDb(key);
+        const [r] = await db.query(
+          "SELECT COUNT(*) AS total FROM prg_patient_reg LIMIT 1"
+        );
+        results.push({ branch: key, db: dbName, ok: true, sample: r[0] });
+      } catch (e) {
+        results.push({ branch: key, db: dbName, ok: false, error: e.message });
+      }
+    }
+    res.json(results);
+  })
+);
+
+////////////////////////////// for all branches and wards
+
+app.get(
+  "/all_branch_wards",
+  safeHandler(async (req, res) => {
+    const branchDBMap = {
+      korangi: "convert_april_k5",
+      azambasti: "convert_april_azambasti",
+      chs: "convert_april_chs",
+      jamshoro: "convert_april_jamshoro",
+      larkana: "convert_april_larkana",
+      sba: "convert_april_sba",
+      sobhraj: "convert_april_sobhraj",
+    };
+
+    const results = {};
+
+    for (const [branch, dbName] of Object.entries(branchDBMap)) {
+      try {
+        const db = await getDb(branch);
+        // ✅ Fetch only wards where app_mobile = 1
+        const [wards] = await db.query(`
+        SELECT DISTINCT ward_name 
+        FROM ward 
+        WHERE mobile_app = 1 
+          AND ward_name IS NOT NULL 
+          AND ward_name != ''
+      `);
+
+        results[branch] = wards.map((w) => w.ward_name);
+        console.log(`✅ ${branch}: ${wards.length} mobile wards`);
+      } catch (err) {
+        console.error(`❌ Failed to fetch for ${branch}:`, err.message);
+        results[branch] = [];
+      }
+    }
+
+    res.json(results);
+  })
+);
+
 // ==========================
 // ✅ GLOBAL ERROR HANDLER
 // ==========================
@@ -489,6 +756,159 @@ app.use((err, req, res, next) => {
     .status(500)
     .json({ error: "Internal Server Error", details: err.message });
 });
+
+////////////////////
+
+app.get(
+  "/patients_by_branch_ward",
+  safeHandler(async (req, res) => {
+    const branch = (req.query.branch || "korangi").toString().toLowerCase();
+    const ward = req.query.ward;
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 50;
+    const offset = (page - 1) * limit;
+    const search = (req.query.search || "").toString().trim();
+
+    if (!branch || !ward) {
+      return res.status(400).json({ error: "branch and ward are required" });
+    }
+
+    const db = await getDb(branch);
+
+    // Build filters safely
+    const whereParts = ["w.WARD_NAME = ?", "w.mobile_app = 1", "ar.status = 1"];
+    const paramsCount = [ward];
+
+    if (search) {
+      // search on patient first/last name, PMR_NO or PATIENT_ID (adjust columns as needed)
+      whereParts.push(
+        "(pr.PATIENT_FNAME LIKE ? OR pr.PATIENT_LNAME LIKE ? OR pr.PMR_NO LIKE ? OR pr.PATIENT_ID LIKE ?)"
+      );
+      const term = `%${search}%`;
+      paramsCount.push(term, term, term, term);
+    }
+
+    const whereSql = whereParts.length
+      ? "WHERE " + whereParts.join(" AND ")
+      : "";
+
+    // 1) total count with search filter
+    const [countRows] = await db.query(
+      `
+      SELECT COUNT(*) AS total
+      FROM adm_requests ar
+      LEFT JOIN ward w ON ar.WARD_ID = w.WARD_ID
+      LEFT JOIN prg_patient_reg pr ON ar.PATIENT_ID = pr.PATIENT_ID
+      ${whereSql}
+      `,
+      paramsCount
+    );
+    const total = countRows[0]?.total || 0;
+
+    // 2) paginated results with same filters
+    const paramsData = [...paramsCount, limit, offset];
+    const [results] = await db.query(
+      `
+  SELECT 
+    ar.ADM_REQ_ID,
+    ar.WARD_ID,
+    w.WARD_NAME,
+    pr.PATIENT_ID,
+    pr.PMR_NO,
+    pr.PATIENT_FNAME,
+    pr.PATIENT_LNAME,
+    TIMESTAMPDIFF(YEAR, pr.DOB, CURDATE()) AS AGE,
+    pr.GENDER,
+    pr.MOBILE_NO,
+    ar.ADM_DATE
+  FROM adm_requests ar
+  LEFT JOIN ward w ON ar.WARD_ID = w.WARD_ID
+  LEFT JOIN prg_patient_reg pr ON ar.PATIENT_ID = pr.PATIENT_ID
+  ${whereSql}
+  ORDER BY ar.ADM_DATE DESC
+  LIMIT ? OFFSET ?
+  `,
+      paramsData
+    );
+
+    res.json({
+      branch,
+      ward,
+      page,
+      limit,
+      total,
+      hasMore: offset + results.length < total,
+      patients: results,
+    });
+  })
+);
+
+/////////////////////
+app.post(
+  "/patients/:id/medicines",
+  safeHandler(async (req, res) => {
+    const branch = req.body.branch || req.query.branch || "korangi";
+    const db = await getDb(branch);
+
+    const patientId = req.params.id;
+    const { medicines } = req.body;
+
+    if (!patientId) {
+      return res.status(400).json({ error: "Patient ID is required" });
+    }
+
+    if (!Array.isArray(medicines) || medicines.length === 0) {
+      return res.status(400).json({ error: "Medicines array is required" });
+    }
+
+    const insertQuery = `
+      INSERT INTO tr_pharmacy_store_request
+      (PATIENT_ID, SUB_ITEM_CAT_ID, ward_dosage, diagnosis, Dosage, day_count, Dosage_Time, dosagetype, Remarks, DATE)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+    `;
+
+    try {
+      for (const med of medicines) {
+        const {
+          SUB_ITEM_CAT_ID,
+          ward_dosage,
+          diagnosis,
+          Dosage,
+          day_count,
+          Dosage_Time,
+          dosagetype,
+          remarks,
+        } = med;
+
+        if (!SUB_ITEM_CAT_ID || !Dosage || !day_count || !dosagetype) {
+          return res.status(400).json({
+            error:
+              "Each medicine must have SUB_ITEM_CAT_ID, Dosage, day_count, and dosagetype",
+          });
+        }
+
+        await db.query(insertQuery, [
+          patientId,
+          SUB_ITEM_CAT_ID,
+          ward_dosage || null,
+          diagnosis || "",
+          Dosage,
+          day_count,
+          Dosage_Time || null,
+          dosagetype,
+          remarks || "",
+        ]);
+      }
+
+      res.json({ success: true, message: "Medicines saved successfully" });
+    } catch (err) {
+      console.error("Error saving medicines:", err.message);
+      res
+        .status(500)
+        .json({ error: "Failed to save medicines", details: err.message });
+    }
+  })
+);
 
 // ==========================
 // ✅ START SERVER

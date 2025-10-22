@@ -24,26 +24,27 @@ interface Message {
 interface Props {
   visible: boolean;
   onClose: () => void;
+  patientId?: number | null;
 }
 
-const BACKEND_BASE = "http://192.168.100.147:3000";
-const HARDCODED_PATIENT_ID = "25902403";
+const BACKEND_BASE = "http://192.168.100.116:3000";
 
-const AIChatModal: React.FC<Props> = ({ visible, onClose }) => {
+const AIChatModal: React.FC<Props> = ({ visible, onClose, patientId }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
-  // Fetch patient info + AI analysis when modal opens
+  // ⚡ Fetch patient analysis only when modal opens (with a valid patientId)
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || !patientId) return;
 
     const fetchPatientAnalysis = async () => {
       setLoading(true);
+      setMessages([]); // clear old messages if any
       try {
         const resp = await axios.get(
-          `${BACKEND_BASE}/patients/${HARDCODED_PATIENT_ID}/full-analysis`
+          `${BACKEND_BASE}/patients/${patientId}/full-analysis`
         );
 
         const patient = resp.data.patient;
@@ -67,12 +68,12 @@ ${analysisText}
         };
 
         setMessages([analysisMessage]);
-      } catch (err: any) {
+      } catch (err) {
         const errorMsg: Message = {
           id: Date.now().toString() + "_error",
           role: "assistant",
           content:
-            "⚠️ Failed to fetch patient analysis. Check backend connection.",
+            "⚠️ Failed to fetch patient analysis. Please check backend connection.",
         };
         setMessages([errorMsg]);
       } finally {
@@ -81,7 +82,7 @@ ${analysisText}
     };
 
     fetchPatientAnalysis();
-  }, [visible]);
+  }, [visible, patientId]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -92,14 +93,14 @@ ${analysisText}
     }
   }, [messages]);
 
-  // User sending message (optional chat functionality)
+  // 💬 Send message manually (optional chat functionality)
   const sendMessage = async () => {
     if (!input.trim()) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input,
+      content: input.trim(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -107,11 +108,10 @@ ${analysisText}
     setLoading(true);
 
     try {
-      const resp = await axios.post(
-        `${BACKEND_BASE}/chat`,
-        { messages: [...messages, userMessage] },
-        { timeout: 30000 }
-      );
+      const resp = await axios.post(`${BACKEND_BASE}/chat`, {
+        messages: [...messages, userMessage],
+        patientId: patientId ?? null,
+      });
 
       const gptText =
         resp.data?.choices?.[0]?.message?.content ??
@@ -130,7 +130,7 @@ ${analysisText}
         id: Date.now().toString() + "_error",
         role: "assistant",
         content:
-          "⚠️ Cannot reach server or OpenAI failed. Check your backend connection.",
+          "⚠️ Could not connect to server. Please check backend connection.",
       };
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
@@ -141,7 +141,6 @@ ${analysisText}
   return (
     <Modal visible={visible} animationType="fade" transparent>
       <View style={styles.overlay}>
-        {/* Background dismiss */}
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={StyleSheet.absoluteFill} />
         </TouchableWithoutFeedback>
@@ -159,7 +158,7 @@ ${analysisText}
               </TouchableOpacity>
             </View>
 
-            {/* Chat Area */}
+            {/* Chat List */}
             <FlatList
               ref={flatListRef}
               data={messages}
@@ -173,50 +172,13 @@ ${analysisText}
                     item.role === "user" ? styles.userBubble : styles.gptBubble,
                   ]}
                 >
-                  {item.role === "assistant" ? (
-                    <>
-                      {item.content
-                        .split("\n")
-                        .map(
-                          (
-                            line:
-                              | string
-                              | number
-                              | bigint
-                              | boolean
-                              | React.ReactElement<
-                                  unknown,
-                                  string | React.JSXElementConstructor<any>
-                                >
-                              | Iterable<React.ReactNode>
-                              | React.ReactPortal
-                              | Promise<
-                                  | string
-                                  | number
-                                  | bigint
-                                  | boolean
-                                  | React.ReactPortal
-                                  | React.ReactElement<
-                                      unknown,
-                                      string | React.JSXElementConstructor<any>
-                                    >
-                                  | Iterable<React.ReactNode>
-                                  | null
-                                  | undefined
-                                >
-                              | null
-                              | undefined,
-                            idx: React.Key | null | undefined
-                          ) => (
-                            <Text key={idx} style={styles.gptText}>
-                              {line}
-                            </Text>
-                          )
-                        )}
-                    </>
-                  ) : (
-                    <Text style={styles.userText}>{item.content}</Text>
-                  )}
+                  <Text
+                    style={
+                      item.role === "user" ? styles.userText : styles.gptText
+                    }
+                  >
+                    {item.content}
+                  </Text>
                 </View>
               )}
             />
@@ -229,13 +191,13 @@ ${analysisText}
               />
             )}
 
-            {/* Input */}
+            {/* Input Section */}
             <View style={styles.inputContainer}>
               <TextInput
                 style={styles.input}
                 value={input}
                 onChangeText={setInput}
-                placeholder="Ask me anything..."
+                placeholder="Ask something..."
                 multiline
               />
               <TouchableOpacity
@@ -243,9 +205,7 @@ ${analysisText}
                 onPress={sendMessage}
                 disabled={loading}
               >
-                <Text style={{ color: "white", fontWeight: "bold" }}>
-                  {loading ? "..." : "Send"}
-                </Text>
+                <Text style={{ color: "white", fontWeight: "bold" }}>Send</Text>
               </TouchableOpacity>
             </View>
           </View>
