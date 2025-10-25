@@ -1,6 +1,8 @@
 import AIChatModal from "@/components/AIChatModal";
 import LabTable from "@/components/LabTable";
+import NewTestRegistration from "@/components/NewTestRegistration";
 import PharmacyTable from "@/components/PharmacyTable";
+import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import { Bot, FileText, Send } from "lucide-react-native";
 import React, {
@@ -41,6 +43,7 @@ type Patient = {
   PATIENT_LNAME?: string;
   GENDER: string;
   WARD_ID?: number;
+  // any other columns that come from backend are OK
 };
 
 type Note = {
@@ -75,29 +78,20 @@ type Radiology = {
   short_history: string;
 };
 
-type PivotedData = {
-  TestID: string;
-  Heading: string;
-  ComponentID: string;
-  NormalRange: string;
-  [date: string]: string;
-};
+const TABS = ["notes", "lab", "radiology", "pharmacy", "newtest"] as const;
 
-const wardMap: Record<number, string> = {
-  921: "PICU",
-  1116: "NICU",
-  1119: "GP",
-};
-
-const TABS = ["notes", "lab", "radiology", "pharmacy"] as const;
 type TabType = (typeof TABS)[number];
 
 export default function PatientsScreen() {
+  // ---------- data + UI state ----------
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // initial page loader
+  const [loadingMore, setLoadingMore] = useState(false); // footer loader
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState(""); // for debounce
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("notes");
   const [notes, setNotes] = useState<Note[]>([]);
@@ -106,28 +100,30 @@ export default function PatientsScreen() {
   const [modalLoading, setModalLoading] = useState(false);
   const [scale, setScale] = useState(1);
   const [messageText, setMessageText] = useState("");
-  // AI Chat Modal State
   const [aiModalVisible, setAiModalVisible] = useState(false);
   const [aiPatientId, setAiPatientId] = useState<number | null>(null);
 
-  const LOCAL_IP = "192.168.100.116";
+  // ---------- network / config ----------
+  const LOCAL_IP = "192.168.100.176";
   const API_BASE =
     Platform.OS === "android"
       ? "http://10.0.2.2:3000"
       : `http://${LOCAL_IP}:3000`;
 
-  const [branch, setBranch] = useState("Korangi");
-  const [ward, setWard] = useState("PICU");
+  // ---------- branch/ward pickers ----------
+  // NOTE: backend expects branch keys lowercase (korangi, azambasti, etc.).
+  const [branch, setBranch] = useState("korangi");
+  const [ward, setWard] = useState("");
   const [branchOpen, setBranchOpen] = useState(false);
   const [wardOpen, setWardOpen] = useState(false);
-  const [branchItemsState, setBranchItemsState] = useState([
-    { label: "Korangi", value: "Korangi" },
-  ]);
-  const [wardItemsState, setWardItemsState] = useState([
-    { label: "PICU", value: "PICU" },
-    { label: "NICU", value: "NICU" },
-    { label: "GP", value: "GP" },
-  ]);
+  const [branchItemsState, setBranchItemsState] = useState<
+    { label: string; value: string }[]
+  >([{ label: "Korangi", value: "korangi" }]);
+  const [wardItemsState, setWardItemsState] = useState<
+    { label: string; value: string }[]
+  >([{ label: "PICU", value: "PICU" }]);
+
+  const branchWardCacheRef = useRef<Record<string, string[]>>({}); // cache fetched branch->wards
 
   const webviewRef = useRef<WebView>(null);
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } =
@@ -135,55 +131,162 @@ export default function PatientsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [loadingWeb, setLoadingWeb] = useState(false);
 
-  const fetchPatients = useCallback(
-    async (pageNum: number = 1, query: string = "") => {
+  // ---------- Debounce search (300ms) ----------
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  // ---------- Fetch branch & wards on mount ----------
+  useEffect(() => {
+    const fetchBranchWardData = async () => {
       try {
-        if (pageNum === 1) setLoading(true);
-        const res = await axios.get(`${API_BASE}/patients_all`, {
-          params: { page: pageNum, limit: 20, search: query },
+        const res = await axios.get(`${API_BASE}/all_branch_wards`);
+        const data = res.data || {};
+
+        // Normalize branch keys to lower-case values for value, label friendly
+        const branches = Object.keys(data).map((b) => ({
+          label: b.charAt(0).toUpperCase() + b.slice(1),
+          value: b.toLowerCase(),
+        }));
+
+        setBranchItemsState(branches);
+
+        // cache full structure
+        branchWardCacheRef.current = Object.keys(data).reduce(
+          (acc, key) => ({ ...acc, [key.toLowerCase()]: data[key] }),
+          {}
+        );
+
+        // set defaults: first branch, first ward of that branch
+        const defaultBranch = branches[0]?.value || "korangi";
+        setBranch(defaultBranch);
+
+        const wardsForDefault = (branchWardCacheRef.current[defaultBranch] ||
+          []) as string[];
+        const wardList = wardsForDefault.map((w) => ({ label: w, value: w }));
+        setWardItemsState(wardList);
+        setWard(wardList[0]?.value || "");
+      } catch (err) {
+        console.error("Error fetching branch/ward data:", err);
+      }
+    };
+
+    fetchBranchWardData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [API_BASE]);
+
+  // ---------- Helper: update wards when branch changes ----------
+  const handleBranchChange = async (newBranch: string) => {
+    // newBranch expected lowercase key (e.g., 'azambasti')
+    setBranch(newBranch);
+    const cached = branchWardCacheRef.current[newBranch];
+    if (cached) {
+      const items = cached.map((w) => ({ label: w, value: w }));
+      setWardItemsState(items);
+      setWard(items[0]?.value || "");
+      return;
+    }
+
+    try {
+      // fallback: re-fetch all branch-wards and update cache
+      const res = await axios.get(`${API_BASE}/all_branch_wards`);
+      const data = res.data || {};
+      branchWardCacheRef.current = Object.keys(data).reduce(
+        (acc, key) => ({ ...acc, [key.toLowerCase()]: data[key] }),
+        {}
+      );
+      const wardsForBranch = branchWardCacheRef.current[newBranch] || [];
+      const items = wardsForBranch.map((w: string) => ({ label: w, value: w }));
+      setWardItemsState(items);
+      setWard(items[0]?.value || "");
+    } catch (e) {
+      console.error("Error updating ward list:", e);
+      setWardItemsState([]);
+      setWard("");
+    }
+  };
+
+  // ---------- Pagination + fetch logic ----------
+  const fetchPatients = useCallback(
+    async (p: number = 1, reset = false) => {
+      // requires branch & ward
+      if (!branch || !ward) {
+        setPatients([]);
+        setHasMore(false);
+        return;
+      }
+
+      try {
+        if (p === 1) {
+          setLoading(true);
+        } else {
+          setLoadingMore(true);
+        }
+        const res = await axios.get(`${API_BASE}/patients_by_branch_ward`, {
+          params: {
+            branch: branch.toLowerCase(),
+            ward,
+            page: p,
+            limit: 50,
+            search: debouncedQuery || undefined, // include search only when present
+          },
         });
-        const data: Patient[] = res.data || [];
-        if (pageNum === 1) setPatients(data);
-        else
+
+        const data: Patient[] = res.data.patients || [];
+        const respPage = res.data.page || p;
+        const respHasMore = !!res.data.hasMore;
+
+        if (reset || respPage === 1) {
+          setPatients(data);
+        } else {
+          // append while deduplicating
           setPatients((prev) => {
             const map = new Map<string | number, Patient>();
-            for (const p of prev) map.set(p.ADM_REQ_ID ?? p.PATIENT_ID, p);
-            for (const p of data) map.set(p.ADM_REQ_ID ?? p.PATIENT_ID, p);
+            for (const item of prev)
+              map.set(item.ADM_REQ_ID ?? item.PATIENT_ID, item);
+            for (const item of data)
+              map.set(item.ADM_REQ_ID ?? item.PATIENT_ID, item);
             return Array.from(map.values());
           });
+        }
+
+        setPage(respPage);
+        setHasMore(respHasMore);
       } catch (err) {
         console.error("Error fetching patients:", err);
       } finally {
         setLoading(false);
+        setLoadingMore(false);
         setRefreshing(false);
       }
     },
-    [API_BASE]
+    [API_BASE, branch, ward, debouncedQuery]
   );
 
+  // initial or when branch/ward/search changes -> reset and fetch page 1
   useEffect(() => {
-    fetchPatients(1, searchQuery);
-  }, [fetchPatients, searchQuery]);
+    if (branch && ward) {
+      setPage(1);
+      setHasMore(true);
+      fetchPatients(1, true);
+    }
+  }, [branch, ward, debouncedQuery, fetchPatients]);
+
+  const loadMore = () => {
+    if (loading || loadingMore || !hasMore) return;
+    const next = page + 1;
+    fetchPatients(next, false);
+  };
 
   const onRefresh = () => {
     setRefreshing(true);
     setPage(1);
-    fetchPatients(1, searchQuery);
+    setHasMore(true);
+    fetchPatients(1, true);
   };
 
-  const loadMore = () => {
-    if (!loading) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      fetchPatients(nextPage, searchQuery);
-    }
-  };
-
-  const filteredPatients = patients.filter((p) => {
-    const wardName = p.WARD_ID ? wardMap[p.WARD_ID] : null;
-    return !ward || wardName === ward;
-  });
-
+  // ---------- modal & tab helpers (unchanged) ----------
   const openModal = async (patient: Patient, type: TabType) => {
     setSelectedPatient(patient);
     setActiveTab(type);
@@ -296,9 +399,6 @@ export default function PatientsScreen() {
         />
       );
 
-    const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } =
-      Dimensions.get("window");
-
     const injectedJS = `
       (function() {
         var meta = document.createElement('meta');
@@ -346,7 +446,9 @@ export default function PatientsScreen() {
                     ? "Lab"
                     : tab === "radiology"
                       ? "Radiology"
-                      : "Pharmacy"}
+                      : tab === "pharmacy"
+                        ? "Pharmacy"
+                        : "New Test"}
               </Text>
             </TouchableOpacity>
           ))}
@@ -441,11 +543,23 @@ export default function PatientsScreen() {
           {activeTab === "pharmacy" && selectedPatient && (
             <PharmacyTable patientId={String(selectedPatient.PATIENT_ID)} />
           )}
+
+          {activeTab === "newtest" && selectedPatient && (
+            <NewTestRegistration
+              patient={{
+                id: selectedPatient.PATIENT_ID,
+                name: `${selectedPatient.PATIENT_FNAME} ${selectedPatient.PATIENT_LNAME || ""}`,
+                gender: selectedPatient.GENDER,
+              }}
+              branch={branch}
+            />
+          )}
         </View>
       </View>
     );
   };
 
+  // ---------- Render ----------
   return (
     <SafeAreaView style={styles.container}>
       {/* Branch / Ward Pickers */}
@@ -463,7 +577,12 @@ export default function PatientsScreen() {
             value={branch}
             items={branchItemsState}
             setOpen={setBranchOpen}
-            setValue={setBranch}
+            // call custom handler to update wards
+            setValue={(fn) => {
+              const value = typeof fn === "function" ? fn(branch) : fn;
+              // ensure lowered value
+              handleBranchChange(String(value).toLowerCase());
+            }}
             setItems={setBranchItemsState}
             placeholder="Select Branch"
             style={{ borderColor: "#ccc" }}
@@ -487,12 +606,27 @@ export default function PatientsScreen() {
         </View>
       </View>
 
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search patient..."
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-      />
+      <View style={{ position: "relative", justifyContent: "center" }}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search patient..."
+          value={searchQuery}
+          onChangeText={(text) => setSearchQuery(text)}
+        />
+
+        {searchQuery.length > 0 && (
+          <TouchableOpacity
+            onPress={() => setSearchQuery("")}
+            style={{
+              position: "absolute",
+              right: 10,
+              padding: 4,
+            }}
+          >
+            <Ionicons name="close-circle" size={20} color="#999" />
+          </TouchableOpacity>
+        )}
+      </View>
 
       {loading && page === 1 ? (
         <ActivityIndicator
@@ -502,7 +636,7 @@ export default function PatientsScreen() {
         />
       ) : (
         <FlatList
-          data={filteredPatients}
+          data={patients}
           keyExtractor={(item) => String(item.ADM_REQ_ID ?? item.PATIENT_ID)}
           renderItem={({ item }) => (
             <View style={styles.card}>
@@ -557,7 +691,9 @@ export default function PatientsScreen() {
                           ? "Lab"
                           : tab === "radiology"
                             ? "Radiology"
-                            : "Pharmacy"}
+                            : tab === "pharmacy"
+                              ? "Pharmacy"
+                              : "New Test"}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -568,6 +704,13 @@ export default function PatientsScreen() {
           onEndReachedThreshold={0.5}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          ListFooterComponent={() =>
+            loadingMore ? (
+              <View style={{ padding: 12 }}>
+                <ActivityIndicator size="small" color="#00A652" />
+              </View>
+            ) : null
           }
         />
       )}
@@ -603,8 +746,6 @@ export default function PatientsScreen() {
               }}
             >
               <Text style={{ fontSize: 20, color: "#999" }}>✕</Text>
-              {/* You can replace ✕ with an icon, e.g., from lucide-react-native */}
-              {/* <X size={22} color="#999" /> */}
             </TouchableOpacity>
 
             <ScrollView style={{ marginTop: 10 }}>
@@ -638,7 +779,6 @@ export default function PatientsScreen() {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f9f9f9" },
   searchInput: {

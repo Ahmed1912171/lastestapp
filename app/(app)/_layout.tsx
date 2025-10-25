@@ -1,24 +1,46 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { Platform } from "react-native";
+import { Dimensions, Platform } from "react-native";
 
 export default function AppLayout() {
+  const { width } = Dimensions.get("window");
+  const isTablet = width >= 800; // 👈 Detect tablet screens
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarShowLabel: false, // 👈 Facebook hides labels
-        tabBarActiveTintColor: "#00A652", // your theme green
+        tabBarShowLabel: false,
+        tabBarActiveTintColor: "#00A652",
         tabBarInactiveTintColor: "#8e8e93",
         tabBarStyle: {
           backgroundColor: "#fff",
-          height: Platform.OS === "ios" ? 70 : 60,
+
+          // ✅ Height and padding
+          height: isTablet
+            ? Platform.OS === "ios"
+              ? 95
+              : 85
+            : Platform.OS === "ios"
+              ? 70
+              : 60,
+          paddingBottom: isTablet ? 25 : Platform.OS === "ios" ? 10 : 6,
+          paddingTop: isTablet ? 12 : 0,
+
+          // ✅ Border and shadows
           borderTopWidth: 0,
-          borderTopColor: "#ddd",
-          elevation: 0,
+          elevation: isTablet ? 14 : 0,
           shadowColor: "#000",
-          shadowOpacity: 0.08,
-          shadowRadius: 5,
+          shadowOpacity: isTablet ? 0.15 : 0.08,
+          shadowRadius: isTablet ? 10 : 5,
+          shadowOffset: { width: 0, height: 6 },
+
+          // ✅ Floating position (tablet only)
+          position: isTablet ? "absolute" : "relative",
+          bottom: isTablet ? 55 : 0, // 👈 raised higher than before
+          left: isTablet ? 60 : 0,
+          right: isTablet ? 60 : 0,
+          borderRadius: isTablet ? 35 : 0,
         },
       }}
     >
@@ -87,45 +109,6 @@ export default function AppLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? "person" : "person-outline"}
-              size={26}
-              color={color}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="Testtab"
-        options={{
-          title: "Test",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? "person" : "person-outline"}
-              size={26}
-              color={color}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="test2"
-        options={{
-          title: "Test",
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? "person" : "person-outline"}
-              size={26}
-              color={color}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="test3"
-        options={{
-          title: "Test",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? "person" : "person-outline"}

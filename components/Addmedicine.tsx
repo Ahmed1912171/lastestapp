@@ -1,5 +1,8 @@
+// AddMedicine.tsx
 import React, { useCallback, useEffect, useState } from "react";
 import {
+  Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
@@ -8,6 +11,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
@@ -54,11 +58,11 @@ interface AddMedicineProps {
   patientId: string | number;
 }
 
-const API_BASE_URL = "http://192.168.100.116:3000";
+const API_BASE_URL = "http://192.168.100.176:3000";
 
 const FIELD_LABELS = {
   dosageCount: "Dosage Count*",
-  wardDosage: "Ward Dosage*",
+  wardDosage: "Dosage*",
   medicineName: "Medicine Name*",
   dayCount: "Day Count*",
   remarks: "Remarks*",
@@ -74,25 +78,68 @@ const DOSAGE_COUNTS = [
   { label: "HS", value: "HS" },
 ];
 
-const WARD_DOSAGES = Array.from({ length: 6 }, (_, i) => ({
-  label: `${i + 1}`,
-  value: `${i + 1}`,
-}));
-
 const DAY_COUNTS = Array.from({ length: 30 }, (_, i) => ({
   label: `${i + 1}`,
   value: `${i + 1}`,
 }));
 
 const AddMedicine: React.FC<AddMedicineProps> = ({ closeModal, patientId }) => {
-  const createEmptyEntry = (): MedicineEntry => ({
+  const [entries, setEntries] = useState<MedicineEntry[]>([]);
+  const [currentDateTime, setCurrentDateTime] = useState<string>("");
+  const [medicineList, setMedicineList] = useState<
+    { label: string; value: string }[]
+  >([]);
+  const [loadingMedicines, setLoadingMedicines] = useState<boolean>(false);
+  const [fetchedDiagnosis, setFetchedDiagnosis] = useState<string>("");
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setCurrentDateTime(
+        now.toLocaleString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        })
+      );
+    };
+    updateTime();
+    const timer = setInterval(updateTime, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const fetchDiagnosis = async () => {
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/tr_pharmacy_store_request?patientId=${patientId}`
+        );
+        const data = await res.json();
+        let latestDiagnosis = "";
+        if (Array.isArray(data) && data.length > 0) {
+          latestDiagnosis = data[data.length - 1].diagnosis || "";
+        }
+        setFetchedDiagnosis(latestDiagnosis);
+        setEntries([createEmptyEntry(latestDiagnosis)]);
+      } catch (err) {
+        console.error("Error fetching diagnosis:", err);
+        setEntries([createEmptyEntry("")]);
+      }
+    };
+    fetchDiagnosis();
+  }, [patientId]);
+
+  const createEmptyEntry = (diagnosis: string): MedicineEntry => ({
     dosageCount: null,
     wardDosage: null,
     dayCount: null,
     subCategory: null,
     medicineName: null,
     dosageType: null,
-    diagnosis: "",
+    diagnosis,
     remarks: "",
     openDosageCount: false,
     openMedicine: false,
@@ -102,33 +149,6 @@ const AddMedicine: React.FC<AddMedicineProps> = ({ closeModal, patientId }) => {
     errors: {},
   });
 
-  const [entries, setEntries] = useState<MedicineEntry[]>([createEmptyEntry()]);
-  const [currentDateTime, setCurrentDateTime] = useState<string>("");
-  const [medicineList, setMedicineList] = useState<
-    { label: string; value: string }[]
-  >([]);
-  const [loadingMedicines, setLoadingMedicines] = useState<boolean>(false);
-
-  // Current Date & Time
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      const formatted = now.toLocaleString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      });
-      setCurrentDateTime(formatted);
-    };
-    updateTime();
-    const timer = setInterval(updateTime, 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Fetch Medicines
   const fetchMedicines = useCallback(async (search = "") => {
     try {
       setLoadingMedicines(true);
@@ -195,7 +215,8 @@ const AddMedicine: React.FC<AddMedicineProps> = ({ closeModal, patientId }) => {
     );
   };
 
-  const addEntry = () => setEntries((prev) => [...prev, createEmptyEntry()]);
+  const addEntry = () =>
+    setEntries((prev) => [...prev, createEmptyEntry(fetchedDiagnosis)]);
   const removeEntry = (index: number) =>
     setEntries((prev) => prev.filter((_, i) => i !== index));
 
@@ -217,41 +238,27 @@ const AddMedicine: React.FC<AddMedicineProps> = ({ closeModal, patientId }) => {
       toggleDropdown(idx, openKey, next);
     };
 
-  // 🔹 Fixed Validation
   const handleSave = async () => {
     let hasError = false;
-
     const updatedEntries = entries.map((entry) => {
       const errors: MedicineEntry["errors"] = {};
-      if (!entry.dosageCount?.trim()) {
-        errors.dosageCount = true;
-        hasError = true;
-      }
-      if (!entry.wardDosage?.trim()) {
-        errors.wardDosage = true;
-        hasError = true;
-      }
-      if (!entry.medicineName?.trim()) {
-        errors.medicineName = true;
-        hasError = true;
-      }
-      if (!entry.dayCount?.trim()) {
-        errors.dayCount = true;
-        hasError = true;
-      }
+      if (!entry.dosageCount?.trim())
+        ((errors.dosageCount = true), (hasError = true));
+      if (!entry.wardDosage?.trim())
+        ((errors.wardDosage = true), (hasError = true));
+      if (!entry.medicineName?.trim())
+        ((errors.medicineName = true), (hasError = true));
+      if (!entry.dayCount?.trim())
+        ((errors.dayCount = true), (hasError = true));
       return { ...entry, errors };
     });
-
     setEntries(updatedEntries);
-
-    if (hasError) {
-      alert("Please fill all required fields.");
-      return;
-    }
+    if (hasError)
+      return Alert.alert("Error", "Please fill all required fields.");
 
     try {
       const payload = {
-        branch: "korangi", // or dynamic branch
+        branch: "korangi",
         medicines: entries.map((entry) => ({
           SUB_ITEM_CAT_ID: entry.medicineName,
           Dosage: entry.dosageCount,
@@ -260,10 +267,9 @@ const AddMedicine: React.FC<AddMedicineProps> = ({ closeModal, patientId }) => {
           dosagetype: entry.dosageType || "Normal",
           remarks: entry.remarks,
           diagnosis: entry.diagnosis || "",
-          Dosage_Time: "", // optional
+          Dosage_Time: "",
         })),
       };
-
       const res = await fetch(
         `${API_BASE_URL}/patients/${patientId}/medicines`,
         {
@@ -272,18 +278,19 @@ const AddMedicine: React.FC<AddMedicineProps> = ({ closeModal, patientId }) => {
           body: JSON.stringify(payload),
         }
       );
-
       const data = await res.json();
-
       if (data.success) {
-        alert("Medicines saved successfully!");
+        Alert.alert("Success", "Medicines saved successfully!");
         closeModal();
       } else {
-        alert("Failed to save medicines: " + (data.error || "Unknown error"));
+        Alert.alert(
+          "Error",
+          "Failed to save medicines: " + (data.error || "Unknown error")
+        );
       }
     } catch (err) {
       console.error("Error saving medicines:", err);
-      alert("Failed to save medicines. Please try again.");
+      Alert.alert("Error", "Failed to save medicines. Please try again.");
     }
   };
 
@@ -291,132 +298,141 @@ const AddMedicine: React.FC<AddMedicineProps> = ({ closeModal, patientId }) => {
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
       >
-        <Text style={styles.title}>Add Medicine</Text>
+        <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>Add Medicine</Text>
 
-        <View style={styles.dateContainer}>
-          <Text style={styles.dateLabel}>Current Date & Time</Text>
-          <TextInput
-            style={styles.dateInput}
-            value={currentDateTime}
-            editable={false}
-          />
-        </View>
-
-        <ScrollView keyboardShouldPersistTaps="handled">
-          {entries.map((entry, idx) => (
-            <View key={idx} style={styles.entryContainer}>
-              <Text style={styles.entryTitle}># {idx + 1}</Text>
-
-              {/* Dosage Count */}
-              <Text style={styles.fieldLabel}>{FIELD_LABELS.dosageCount}</Text>
-              <View style={{ zIndex: entry.openDosageCount ? 2000 : 1000 }}>
-                <DropDownPicker
-                  open={entry.openDosageCount}
-                  value={entry.dosageCount || ""}
-                  items={DOSAGE_COUNTS}
-                  setOpen={makeSetOpenHandler(idx, "openDosageCount")}
-                  setValue={makeSetValueHandler(idx, "dosageCount")}
-                  placeholder="Dosage Count"
-                  listMode="SCROLLVIEW"
-                  style={[
-                    styles.dropdown,
-                    entry.errors?.dosageCount && styles.errorBorder,
-                  ]}
-                  dropDownContainerStyle={styles.dropdownContainer}
-                />
-              </View>
-
-              {/* Ward Dosage */}
-              <Text style={styles.fieldLabel}>{FIELD_LABELS.wardDosage}</Text>
-              <View style={{ zIndex: entry.openWardDosage ? 1999 : 999 }}>
-                <DropDownPicker
-                  open={entry.openWardDosage}
-                  value={entry.wardDosage || ""}
-                  items={WARD_DOSAGES}
-                  setOpen={makeSetOpenHandler(idx, "openWardDosage")}
-                  setValue={makeSetValueHandler(idx, "wardDosage")}
-                  placeholder="Ward Dosage"
-                  listMode="SCROLLVIEW"
-                  style={[
-                    styles.dropdown,
-                    entry.errors?.wardDosage && styles.errorBorder,
-                  ]}
-                  dropDownContainerStyle={styles.dropdownContainer}
-                />
-              </View>
-
-              {/* Medicine Name */}
-              <Text style={styles.fieldLabel}>{FIELD_LABELS.medicineName}</Text>
-              <View style={{ zIndex: entry.openMedicine ? 1998 : 998 }}>
-                <DropDownPicker
-                  open={entry.openMedicine}
-                  value={entry.medicineName || ""}
-                  items={medicineList}
-                  loading={loadingMedicines}
-                  searchable
-                  searchPlaceholder="Search medicine..."
-                  onChangeSearchText={(t) => fetchMedicines(t)}
-                  setOpen={makeSetOpenHandler(idx, "openMedicine")}
-                  setValue={makeSetValueHandler(idx, "medicineName")}
-                  placeholder="Select Medicine"
-                  listMode="SCROLLVIEW"
-                  style={[
-                    styles.dropdown,
-                    entry.errors?.medicineName && styles.errorBorder,
-                  ]}
-                  dropDownContainerStyle={styles.dropdownContainer}
-                />
-              </View>
-
-              {/* Day Count */}
-              <Text style={styles.fieldLabel}>{FIELD_LABELS.dayCount}</Text>
-              <View style={{ zIndex: entry.openDay ? 1997 : 997 }}>
-                <DropDownPicker
-                  open={entry.openDay}
-                  value={entry.dayCount || ""}
-                  items={DAY_COUNTS}
-                  setOpen={makeSetOpenHandler(idx, "openDay")}
-                  setValue={makeSetValueHandler(idx, "dayCount")}
-                  placeholder="Day Count"
-                  listMode="SCROLLVIEW"
-                  style={[
-                    styles.dropdown,
-                    entry.errors?.dayCount && styles.errorBorder,
-                  ]}
-                  dropDownContainerStyle={styles.dropdownContainer}
-                />
-              </View>
-
-              {/* Remarks */}
-              <Text style={styles.fieldLabel}>{FIELD_LABELS.remarks}</Text>
+            <View style={styles.dateContainer}>
+              <Text style={styles.dateLabel}>Current Date & Time</Text>
               <TextInput
-                style={styles.input}
-                placeholder="Remarks"
-                value={entry.remarks}
-                onChangeText={(v) => updateText(idx, v)}
+                style={styles.dateInput}
+                value={currentDateTime}
+                editable={false}
               />
-
-              {entries.length > 1 && (
-                <TouchableOpacity
-                  style={styles.removeBtn}
-                  onPress={() => removeEntry(idx)}
-                >
-                  <Text style={styles.removeBtnText}>Remove Entry</Text>
-                </TouchableOpacity>
-              )}
             </View>
-          ))}
 
-          <TouchableOpacity style={styles.addBtn} onPress={addEntry}>
-            <Text style={styles.addBtnText}>+ Add Another Medicine</Text>
-          </TouchableOpacity>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: 120 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {entries.map((entry, idx) => (
+                <View
+                  key={idx}
+                  style={[
+                    styles.entryContainer,
+                    { zIndex: 1000 - idx, position: "relative" },
+                  ]}
+                >
+                  <Text style={styles.entryTitle}># {idx + 1}</Text>
 
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-            <Text style={styles.saveBtnText}>Save</Text>
-          </TouchableOpacity>
-        </ScrollView>
+                  <Text style={styles.fieldLabel}>Diagnosis</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: "#f0f0f0" }]}
+                    value={entry.diagnosis}
+                    editable={false}
+                  />
+                  <Text style={styles.fieldLabel}>
+                    {FIELD_LABELS.medicineName}
+                  </Text>
+                  <DropDownPicker
+                    open={entry.openMedicine}
+                    value={entry.medicineName || ""}
+                    items={medicineList}
+                    loading={loadingMedicines}
+                    searchable
+                    searchPlaceholder="Search medicine..."
+                    onChangeSearchText={(t) => fetchMedicines(t)}
+                    setOpen={makeSetOpenHandler(idx, "openMedicine")}
+                    setValue={makeSetValueHandler(idx, "medicineName")}
+                    placeholder="Select Medicine"
+                    listMode="SCROLLVIEW"
+                    style={[
+                      styles.dropdown,
+                      entry.errors?.medicineName && styles.errorBorder,
+                    ]}
+                    dropDownContainerStyle={{ zIndex: 10000, elevation: 10 }}
+                  />
+
+                  <Text style={styles.fieldLabel}>
+                    {FIELD_LABELS.dosageCount}
+                  </Text>
+                  <DropDownPicker
+                    open={entry.openDosageCount}
+                    value={entry.dosageCount || ""}
+                    items={DOSAGE_COUNTS}
+                    setOpen={makeSetOpenHandler(idx, "openDosageCount")}
+                    setValue={makeSetValueHandler(idx, "dosageCount")}
+                    placeholder="Dosage Count"
+                    listMode="SCROLLVIEW"
+                    style={[
+                      styles.dropdown,
+                      entry.errors?.dosageCount && styles.errorBorder,
+                    ]}
+                    dropDownContainerStyle={{ zIndex: 10000, elevation: 10 }}
+                  />
+
+                  <Text style={styles.fieldLabel}>
+                    {FIELD_LABELS.wardDosage}
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      entry.errors?.wardDosage && styles.errorBorder,
+                    ]}
+                    placeholder="Ward Dosage"
+                    value={entry.wardDosage || ""}
+                    onChangeText={(val) => onSelect(idx, "wardDosage", val)}
+                  />
+
+                  <Text style={styles.fieldLabel}>{FIELD_LABELS.dayCount}</Text>
+                  <DropDownPicker
+                    open={entry.openDay}
+                    value={entry.dayCount || ""}
+                    items={DAY_COUNTS}
+                    setOpen={makeSetOpenHandler(idx, "openDay")}
+                    setValue={makeSetValueHandler(idx, "dayCount")}
+                    placeholder="Day Count"
+                    listMode="SCROLLVIEW"
+                    style={[
+                      styles.dropdown,
+                      entry.errors?.dayCount && styles.errorBorder,
+                    ]}
+                    dropDownContainerStyle={{ zIndex: 10000, elevation: 10 }}
+                  />
+
+                  <Text style={styles.fieldLabel}>{FIELD_LABELS.remarks}</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Remarks"
+                    value={entry.remarks}
+                    onChangeText={(v) => updateText(idx, v)}
+                  />
+
+                  {entries.length > 1 && (
+                    <TouchableOpacity
+                      style={styles.removeBtn}
+                      onPress={() => removeEntry(idx)}
+                    >
+                      <Text style={styles.removeBtnText}>Remove Entry</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+
+              <TouchableOpacity style={styles.addBtn} onPress={addEntry}>
+                <Text style={styles.addBtnText}>+ Add Another Medicine</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+                <Text style={styles.saveBtnText}>Save</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -452,7 +468,6 @@ const styles = StyleSheet.create({
   entryTitle: { fontWeight: "bold", marginBottom: 10 },
   fieldLabel: { fontWeight: "600", marginBottom: 5 },
   dropdown: { borderColor: "#ccc", marginVertical: 6 },
-  dropdownContainer: { borderColor: "#ccc", elevation: 10 },
   input: {
     borderWidth: 1,
     borderColor: "#ccc",

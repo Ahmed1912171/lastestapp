@@ -910,7 +910,96 @@ app.post(
   })
 );
 
-////////////////////////
+//  New code to register new tests
+
+app.post(
+  "/register-test",
+  safeHandler(async (req, res) => {
+    const branch = req.body.branch || req.query.branch || "korangi";
+    const db = await getDb(branch);
+
+    const {
+      Patient_ID,
+      LabNo,
+      RegisterationDate,
+      RegisterationTime,
+      PatientName,
+      Gender,
+      Age,
+      TestID,
+      Remarks,
+      ReferedID,
+      TestSourceID,
+      WardID,
+      User_ID,
+      PaymentComplete,
+      NetAmount,
+    } = req.body;
+
+    // ✅ Basic validation
+    if (!Patient_ID || !LabNo || !PatientName || !TestID) {
+      return res.status(400).json({
+        error:
+          "Missing required fields: Patient_ID, LabNo, PatientName, TestID",
+      });
+    }
+
+    // ✅ Prepare query
+    const insertQuery = `
+      INSERT INTO a_ordering (
+        Patient_ID, 
+        LabNo, 
+        RegisterationDate, 
+        RegisterationTime,
+        PatientName,
+        Gender,
+        Age,
+        TestID,
+        Remarks,
+        ReferedID,
+        TestSourceID,
+        WardID,
+        User_ID,
+        PaymentComplete,
+        NetAmount
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const values = [
+      Patient_ID,
+      LabNo,
+      RegisterationDate || new Date().toISOString().split("T")[0],
+      RegisterationTime || new Date().toLocaleTimeString("en-GB"),
+      PatientName,
+      Gender || "",
+      Age || null,
+      TestID,
+      Remarks || "",
+      ReferedID || null,
+      TestSourceID || null,
+      WardID || null,
+      User_ID || null,
+      PaymentComplete || 0,
+      NetAmount || 0,
+    ];
+
+    try {
+      const [result] = await db.query(insertQuery, values);
+      res.json({
+        success: true,
+        message: "New test registered successfully",
+        orderId: result.insertId,
+      });
+    } catch (err) {
+      console.error("❌ Error inserting test:", err);
+      res.status(500).json({
+        error: "Failed to register test",
+        details: err.message,
+      });
+    }
+  })
+);
 
 // ==========================
 // ✅ START SERVER
