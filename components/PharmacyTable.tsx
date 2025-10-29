@@ -35,7 +35,7 @@ const PharmacyTable: React.FC<PharmacyTableProps> = ({ patientId }) => {
   const fetchData = useCallback(async () => {
     try {
       const { data } = await axios.get(
-        `http://192.168.100.176:3000/tr_pharmacy_store_request?patientId=${patientId}`
+        `http://192.168.100.64:3000/tr_pharmacy_store_request?patientId=${patientId}`
       );
 
       const activeMeds = (data || []).filter(

@@ -1002,6 +1002,159 @@ app.post(
 );
 
 // ==========================
+// 🔹 TEST LIST (with Specimun)
+// ==========================
+app.get(
+  "/test-list",
+  safeHandler(async (req, res) => {
+    const branch = req.query.branch || "korangi";
+    const search = req.query.search ? `%${req.query.search}%` : "%";
+    const db = await getDb(branch);
+
+    const [rows] = await db.query(
+      `
+      SELECT TestID, TestTitle, Specimun
+      FROM a_test
+      WHERE TestTitle LIKE ? OR TestID LIKE ?
+      ORDER BY Specimun DESC
+      LIMIT 500
+      `,
+      [search, search]
+    );
+
+    res.json(rows);
+  })
+);
+
+// ==========================
+// 🔹 GET LATEST ORDER
+// ==========================
+app.get(
+  "/latest-order",
+  safeHandler(async (req, res) => {
+    const branch = req.query.branch || "korangi";
+    const db = await getDb(branch);
+
+    const [rows] = await db.query(`
+      SELECT 
+        Order_Id,
+        Barcode_no,
+        Pkod_detail
+      FROM a_order_detail
+      ORDER BY CAST(Barcode_no AS UNSIGNED) DESC
+      LIMIT 1
+    `);
+
+    if (!rows.length) {
+      return res.status(404).json({ error: "No orders found" });
+    }
+
+    return res.json(rows[0]);
+  })
+);
+
+// ==========================
+// 🔹 BOOK MULTIPLE TESTS (JS version)
+// ==========================
+app.post(
+  "/book-tests",
+  safeHandler(async (req, res) => {
+    const { tests = [], branch = "korangi", Order_Id } = req.body;
+
+    if (!Order_Id) return res.status(400).json({ error: "Order_Id missing" });
+    if (!Array.isArray(tests) || tests.length === 0) {
+      return res.status(400).json({ error: "No tests provided" });
+    }
+
+    const db = await getDb(branch);
+
+    try {
+      await db.beginTransaction();
+
+      const inserted = [];
+
+      for (const t of tests) {
+        const { TestID, Pkod_detail, Barcode_no } = t;
+
+        await db.query(
+          `INSERT INTO a_order_detail (Order_Id, TestID, Pkod_detail, Barcode_no)
+           VALUES (?, ?, ?, ?)`,
+          [Order_Id, TestID, Pkod_detail, Barcode_no]
+        );
+
+        inserted.push({ Order_Id, TestID, Pkod_detail, Barcode_no });
+      }
+
+      await db.commit();
+      res.json({ success: true, Order_Id, records: inserted });
+    } catch (err) {
+      await db.rollback();
+      console.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  })
+);
+
+// ==========================
+// 🔹 PREVIEW NEXT TESTS (no DB insert)
+// ==========================
+app.post(
+  "/generate-next-tests",
+  safeHandler(async (req, res) => {
+    const { TestIDs = [], branch = "korangi" } = req.body;
+
+    if (!Array.isArray(TestIDs) || TestIDs.length === 0) {
+      return res.status(400).json({ error: "No tests provided" });
+    }
+
+    const db = await getDb(branch);
+
+    // Fetch last inserted barcode and pkod
+    const [lastRows] = await db.query(`
+      SELECT Barcode_no, Pkod_detail
+      FROM a_order_detail
+      ORDER BY Order_Id DESC
+      LIMIT 1
+    `);
+
+    let lastBarcode = lastRows[0]?.Barcode_no ?? "00000000";
+    let lastPkodNum =
+      parseInt(String(lastRows[0]?.Pkod_detail ?? 0).replace(/\D/g, ""), 10) ||
+      0;
+
+    const generated = [];
+
+    for (const TestID of TestIDs) {
+      const [specRows] = await db.query(
+        `SELECT TestTitle, Specimun FROM a_test WHERE TestID = ? LIMIT 1`,
+        [TestID]
+      );
+
+      if (!specRows.length) continue;
+
+      const specCode = String(specRows[0].Specimun).padStart(2, "0"); // Specimun dynamic
+      const barcodeBase = lastBarcode.slice(0, -2); // remove last 2 digits
+      const newBarcode = barcodeBase + specCode; // append Specimun
+
+      lastPkodNum++; // increment PKOD
+      const newPkod = `${String(lastPkodNum).padStart(5, "0")}`;
+
+      generated.push({
+        TestID,
+        TestTitle: specRows[0].TestTitle,
+        Pkod_detail: newPkod,
+        Barcode_no: newBarcode,
+        Specimun: specRows[0].Specimun,
+      });
+
+      lastBarcode = newBarcode; // update for next test
+    }
+
+    res.json({ success: true, generated });
+  })
+);
+
+// ==========================
 // ✅ START SERVER
 // ==========================
 const PORT = 3000;

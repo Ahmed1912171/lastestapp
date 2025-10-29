@@ -1,7 +1,13 @@
 // app/(tabs)/attendance.tsx
 import { Activity, Calendar, Clock, UserCheck } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import SimpleAvatar from "../../components/SimpleAvatar";
 
@@ -21,14 +27,35 @@ type AttendanceLog = {
 };
 
 const initialLogs: AttendanceLog[] = [
-  { date: "2025-09-21", timeIn: "08:05 AM", timeOut: "04:15 PM", status: "Late" },
-  { date: "2025-09-22", timeIn: "08:00 AM", timeOut: "04:00 PM", status: "On Time" },
-  { date: "2025-09-23", timeIn: "08:12 AM", timeOut: "04:20 PM", status: "Late" },
-  { date: "2025-09-24", timeIn: "08:00 AM", timeOut: "04:00 PM", status: "On Time" },
+  {
+    date: "2025-09-21",
+    timeIn: "08:05 AM",
+    timeOut: "04:15 PM",
+    status: "Late",
+  },
+  {
+    date: "2025-09-22",
+    timeIn: "08:00 AM",
+    timeOut: "04:00 PM",
+    status: "On Time",
+  },
+  {
+    date: "2025-09-23",
+    timeIn: "08:12 AM",
+    timeOut: "04:20 PM",
+    status: "Late",
+  },
+  {
+    date: "2025-09-24",
+    timeIn: "08:00 AM",
+    timeOut: "04:00 PM",
+    status: "On Time",
+  },
 ];
 
 export default function AttendanceScreen() {
-  const [attendanceLogs, setAttendanceLogs] = useState<AttendanceLog[]>(initialLogs);
+  const [attendanceLogs, setAttendanceLogs] =
+    useState<AttendanceLog[]>(initialLogs);
   const [isPresent, setIsPresent] = useState(false);
   const [currentTime, setCurrentTime] = useState<string>("");
 
@@ -63,7 +90,7 @@ export default function AttendanceScreen() {
 
   // Dashboard stats
   const totalDays = attendanceLogs.length;
-  const lateDays = attendanceLogs.filter(log => log.status === "Late").length;
+  const lateDays = attendanceLogs.filter((log) => log.status === "Late").length;
   const onTimeDays = totalDays - lateDays;
 
   return (
@@ -74,13 +101,22 @@ export default function AttendanceScreen() {
           <Text style={styles.title}>Attendance</Text>
           <Text style={styles.subtitle}>Hello, {loggedInUser.name}</Text>
         </View>
-        <SimpleAvatar fallback={loggedInUser.name.split(" ").map(n => n[0]).join("")} size={48} />
+        <SimpleAvatar
+          fallback={loggedInUser.name
+            .split(" ")
+            .map((n) => n[0])
+            .join("")}
+          size={48}
+        />
       </View>
 
       {/* Mark Attendance Button */}
       <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
         <TouchableOpacity
-          style={[styles.attendanceButton, isPresent && { backgroundColor: "#10b981" }]}
+          style={[
+            styles.attendanceButton,
+            isPresent && { backgroundColor: "#10b981" },
+          ]}
           onPress={markAttendance}
           disabled={isPresent}
         >
@@ -89,7 +125,9 @@ export default function AttendanceScreen() {
             {isPresent ? "Marked Present" : "Mark Attendance"}
           </Text>
         </TouchableOpacity>
-        <Text style={{ marginTop: 8, color: "#666" }}>Current Time: {currentTime}</Text>
+        <Text style={{ marginTop: 8, color: "#666" }}>
+          Current Time: {currentTime}
+        </Text>
       </View>
 
       {/* Stats Dashboard */}
@@ -115,11 +153,23 @@ export default function AttendanceScreen() {
       <ScrollView contentContainerStyle={{ padding: 16 }}>
         {attendanceLogs.map((log, index) => (
           <View key={index} style={styles.logCard}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <View
+              style={{ flexDirection: "row", justifyContent: "space-between" }}
+            >
               <Text style={{ fontWeight: "600" }}>{log.date}</Text>
-              <Text style={{ color: log.status === "Late" ? "#ef4444" : "#10b981" }}>{log.status}</Text>
+              <Text
+                style={{ color: log.status === "Late" ? "#ef4444" : "#10b981" }}
+              >
+                {log.status}
+              </Text>
             </View>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                marginTop: 4,
+              }}
+            >
               <Text>Time In: {log.timeIn}</Text>
               <Text>Time Out: {log.timeOut || "-"}</Text>
             </View>

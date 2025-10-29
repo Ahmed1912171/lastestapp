@@ -1,5 +1,18 @@
-import React, { useState } from "react";
-import { Alert, Button, ScrollView, Text, TextInput, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+} from "react-native";
+import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 
 type Props = {
   patient: {
@@ -10,149 +23,336 @@ type Props = {
   branch: string;
 };
 
+type TestResult = {
+  id: string | number;
+  TestID: string | number;
+  TestTitle: string;
+  Specimun?: string | number;
+};
+
+type PreviewRow = {
+  TestID: string | number;
+  TestTitle?: string;
+  Pkod_detail?: string;
+  Barcode_no?: string;
+  Specimun?: string | number;
+};
+
 export default function NewTestRegistration({ patient, branch }: Props) {
-  const [form, setForm] = useState({
+  const [form] = useState({
     branch,
     Patient_ID: String(patient.id),
-    LabNo: "",
     PatientName: patient.name,
     Gender: patient.gender || "",
-    Age: "",
-    TestID: "",
-    Remarks: "",
-    ReferedID: "",
-    TestSourceID: "",
-    WardID: "",
-    User_ID: "admin",
-    NetAmount: "",
   });
 
-  const handleChange = (field: string, value: string) => {
-    setForm({ ...form, [field]: value });
-  };
+  const [searchQuery, setSearchQuery] = useState("");
+  const [testResults, setTestResults] = useState<TestResult[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedTests, setSelectedTests] = useState<PreviewRow[]>([]);
+  const [latestOrder, setLatestOrder] = useState<any>(null);
+  const [loadingRegister, setLoadingRegister] = useState(false);
+  const [prefixCounter, setPrefixCounter] = useState<number>(0);
 
-  const handleSubmit = async () => {
-    if (!form.Patient_ID || !form.LabNo || !form.PatientName || !form.TestID) {
-      Alert.alert("Missing data", "Please fill in all required fields.");
+  const scrollRef = useRef<ScrollView | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const API_BASE = "http://192.168.100.64:3000";
+  const DEBOUNCE = 250;
+
+  async function fetchJsonSafe(url: string, opts?: RequestInit) {
+    const res = await fetch(url, opts);
+    const text = await res.text();
+    return JSON.parse(text);
+  }
+
+  // ✅ Fetch latest order
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      try {
+        const data = await fetchJsonSafe(
+          `${API_BASE}/latest-order?branch=${branch}`
+        );
+        const latest = data.latestOrder ?? data;
+        if (mounted && latest) {
+          setLatestOrder(latest);
+          setPrefixCounter(Number(latest.Barcode_no.slice(0, -2)));
+        }
+      } catch {}
+    }
+    load();
+    const intv = setInterval(load, 8000);
+    return () => {
+      mounted = false;
+      clearInterval(intv);
+    };
+  }, [branch]);
+
+  // 🔍 Live Test Search (FIXED CLEANUP)
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setShowDropdown(false);
       return;
     }
 
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    debounceRef.current = setTimeout(async () => {
+      const data = await fetchJsonSafe(
+        `${API_BASE}/test-list?branch=${branch}&search=${searchQuery}`
+      );
+
+      setTestResults(Array.isArray(data) ? data : []);
+      setShowDropdown(Array.isArray(data) && data.length > 0);
+    }, DEBOUNCE);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [searchQuery, branch]);
+
+  // ✅ Add Test
+  function handleSelectTest(item: TestResult) {
+    const id = String(item.TestID);
+    if (selectedTests.some((t) => t.TestID === id)) return;
+
+    setPrefixCounter((prev) => {
+      const newPrefix = prev + 1;
+      const spec = String(item.Specimun ?? "01").padStart(2, "0");
+
+      setSelectedTests((p) => [
+        ...p,
+        {
+          TestID: id,
+          TestTitle: item.TestTitle,
+          Specimun: spec,
+          Barcode_no: String(newPrefix).padStart(8, "0") + spec,
+          Pkod_detail: `PK${String(newPrefix).padStart(5, "0")}`,
+        },
+      ]);
+
+      return newPrefix;
+    });
+
+    setSearchQuery("");
+    setShowDropdown(false);
+  }
+
+  // ❌ Remove Test
+  function handleRemoveTest(id: string | number) {
+    setSelectedTests((p) => p.filter((t) => t.TestID !== id));
+  }
+
+  // ✅ Register Tests
+  const handleSubmit = async () => {
+    if (!selectedTests.length)
+      return Alert.alert("Missing", "Select at least one test.");
+
+    if (!latestOrder || !latestOrder.Order_Id)
+      return Alert.alert("Error", "Latest order not loaded yet.");
+
+    setLoadingRegister(true);
+
+    const newOrderId = Number(latestOrder.Order_Id) + 1;
+
     try {
-      const response = await fetch("http://localhost:3000/register-test", {
+      const res = await fetchJsonSafe(`${API_BASE}/book-tests`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          branch,
+          Order_Id: newOrderId,
+          Patient_ID: form.Patient_ID,
+          tests: selectedTests,
+        }),
       });
 
-      const data = await response.json();
-
-      if (data.success) {
-        Alert.alert(
-          "✅ Success",
-          `Test registered successfully (Order ID: ${data.orderId})`
-        );
-        // Reset form
-        setForm({
-          branch: "korangi",
-          Patient_ID: "",
-          LabNo: "",
-          PatientName: "",
-          Gender: "",
-          Age: "",
-          TestID: "",
-          Remarks: "",
-          ReferedID: "",
-          TestSourceID: "",
-          WardID: "",
-          User_ID: "admin",
-          NetAmount: "",
-        });
+      if (res.success) {
+        Alert.alert("✅ Success", `Order #${newOrderId} registered`);
+        setSelectedTests([]);
+        setLatestOrder((p: any) => ({ ...p, Order_Id: newOrderId }));
       } else {
-        Alert.alert("❌ Error", data.error || "Failed to register test.");
+        Alert.alert("Error", res.error);
       }
-    } catch (err: any) {
-      console.error("Error:", err);
-      Alert.alert("Network Error", "Unable to reach the server.");
+    } catch {
+      Alert.alert("Network Error", "Unable to reach server.");
     }
+
+    setLoadingRegister(false);
   };
 
+  const renderDeleteAction = (onPress: () => void) => (
+    <View style={styles.deleteSwipeBox}>
+      <TouchableOpacity onPress={onPress}>
+        <Text style={styles.deleteSwipeText}>Delete</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
-    <ScrollView style={{ padding: 16 }}>
-      <Text style={{ fontSize: 22, fontWeight: "bold", marginBottom: 12 }}>
-        🧪 New Test Registration
-      </Text>
+    <TouchableWithoutFeedback onPress={() => setShowDropdown(false)}>
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{ flex: 1 }}
+        >
+          <ScrollView ref={scrollRef} contentContainerStyle={styles.container}>
+            <Text style={styles.title}>New Test Registration</Text>
 
-      <Text>Patient ID*</Text>
-      <TextInput
-        style={styles.input}
-        value={form.Patient_ID}
-        onChangeText={(text) => handleChange("Patient_ID", text)}
-      />
+            <TextInput
+              style={styles.input}
+              placeholder="Search test..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
 
-      <Text>Lab No*</Text>
-      <TextInput
-        style={styles.input}
-        value={form.LabNo}
-        onChangeText={(text) => handleChange("LabNo", text)}
-      />
+            {showDropdown && (
+              <View style={styles.dropdown}>
+                {testResults.map((item) => (
+                  <TouchableOpacity
+                    key={String(item.TestID)}
+                    style={styles.dropdownItem}
+                    onPress={() => handleSelectTest(item)}
+                  >
+                    <Text>
+                      {item.TestID} - {item.TestTitle}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
-      <Text>Patient Name*</Text>
-      <TextInput
-        style={styles.input}
-        value={form.PatientName}
-        onChangeText={(text) => handleChange("PatientName", text)}
-      />
+            {/* ✅ Simplified 3-Column Table */}
+            <View style={styles.tableBox}>
+              <Text style={styles.tableTitle}>Selected Tests</Text>
 
-      <Text>Gender</Text>
-      <TextInput
-        style={styles.input}
-        value={form.Gender}
-        onChangeText={(text) => handleChange("Gender", text)}
-      />
+              <View style={styles.tableHeader}>
+                <Text style={[styles.cellHeader, { width: 50 }]}>S.No</Text>
+                <Text style={[styles.cellHeader, { flex: 1 }]}>TestID</Text>
+                <Text style={[styles.cellHeader, { flex: 2 }]}>Test Title</Text>
+                <Text style={[styles.cellHeader, { width: 40 }]}>✕</Text>
+              </View>
 
-      <Text>Age</Text>
-      <TextInput
-        style={styles.input}
-        value={form.Age}
-        keyboardType="numeric"
-        onChangeText={(text) => handleChange("Age", text)}
-      />
+              {selectedTests.map((r, index) => (
+                <Swipeable
+                  key={String(r.TestID)}
+                  renderRightActions={() =>
+                    renderDeleteAction(() => handleRemoveTest(r.TestID))
+                  }
+                >
+                  <View style={styles.tableRow}>
+                    <Text style={[styles.cellText, { width: 50 }]}>
+                      {index + 1}
+                    </Text>
+                    <Text style={[styles.cellText, { flex: 1 }]}>
+                      {r.TestID}
+                    </Text>
+                    <Text style={[styles.cellText, { flex: 2 }]}>
+                      {r.TestTitle}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.deleteCell}
+                      onPress={() => handleRemoveTest(r.TestID)}
+                    >
+                      <Text style={styles.deleteX}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                </Swipeable>
+              ))}
+            </View>
 
-      <Text>Test ID*</Text>
-      <TextInput
-        style={styles.input}
-        value={form.TestID}
-        onChangeText={(text) => handleChange("TestID", text)}
-      />
-
-      <Text>Remarks</Text>
-      <TextInput
-        style={styles.input}
-        value={form.Remarks}
-        onChangeText={(text) => handleChange("Remarks", text)}
-      />
-
-      <Text>Net Amount</Text>
-      <TextInput
-        style={styles.input}
-        value={form.NetAmount}
-        keyboardType="numeric"
-        onChangeText={(text) => handleChange("NetAmount", text)}
-      />
-
-      <View style={{ marginTop: 20 }}>
-        <Button title="Register Test" onPress={handleSubmit} />
-      </View>
-    </ScrollView>
+            <TouchableOpacity
+              style={styles.saveBtn}
+              onPress={handleSubmit}
+              disabled={loadingRegister}
+            >
+              <Text style={styles.saveBtnText}>
+                {loadingRegister ? "Saving..." : "Register Tests"}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </TouchableWithoutFeedback>
   );
 }
 
-const styles = {
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: "#fff" },
+  container: { padding: 20, paddingBottom: 80 },
+  title: {
+    fontSize: 22,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 12,
+  },
   input: {
     borderWidth: 1,
     borderColor: "#ccc",
-    padding: 8,
-    borderRadius: 8,
-    marginBottom: 10,
+    borderRadius: 6,
+    padding: 10,
+    backgroundColor: "#fafafa",
   },
-};
+  dropdown: { borderWidth: 1, borderColor: "#ddd", backgroundColor: "#fff" },
+  dropdownItem: { padding: 10 },
+
+  tableBox: {
+    marginTop: 14,
+    borderWidth: 1.5,
+    borderColor: "#00A652",
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  tableTitle: {
+    backgroundColor: "#00A652",
+    color: "#fff",
+    fontWeight: "700",
+    paddingVertical: 10,
+    textAlign: "center",
+    fontSize: 15,
+  },
+  tableHeader: {
+    flexDirection: "row",
+    backgroundColor: "#caffda",
+    borderBottomWidth: 1,
+    borderColor: "#00A652",
+  },
+  cellHeader: {
+    textAlign: "center",
+    fontWeight: "700",
+    fontSize: 13,
+    paddingVertical: 6,
+    color: "#006600",
+  },
+  tableRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    backgroundColor: "#f9fff9",
+  },
+  cellText: {
+    textAlign: "center",
+    fontSize: 14,
+    color: "#000",
+    paddingVertical: 4,
+  },
+  deleteCell: { width: 40, alignItems: "center" },
+  deleteX: { color: "red", fontWeight: "700", fontSize: 18 },
+  deleteSwipeBox: {
+    backgroundColor: "red",
+    justifyContent: "center",
+    alignItems: "center",
+    width: 80,
+  },
+  deleteSwipeText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  saveBtn: {
+    marginTop: 20,
+    backgroundColor: "#00A652",
+    padding: 14,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  saveBtnText: { color: "#fff", fontWeight: "700" },
+});

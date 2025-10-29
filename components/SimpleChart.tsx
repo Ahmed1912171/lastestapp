@@ -13,8 +13,8 @@ type SimpleChartProps = {
 };
 
 export default function SimpleChart({ data = [] }: SimpleChartProps) {
-  const labels = data.map(item => item.name);
-  const values = data.map(item => item.patients);
+  const labels = data.map((item) => item.name);
+  const values = data.map((item) => item.patients);
 
   // full screen width minus padding of parent card (16px * 2 = 32)
   const screenWidth = Dimensions.get("window").width - 32;

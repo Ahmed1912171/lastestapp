@@ -32,6 +32,24 @@ import Modal from "react-native-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 
+import {
+  Pill,
+  PlusCircle,
+  ScanText,
+  TestTubeDiagonal,
+} from "lucide-react-native";
+
+const TAB_ICONS: Record<
+  TabType,
+  React.ComponentType<{ size: number; color: string }>
+> = {
+  notes: FileText,
+  lab: TestTubeDiagonal,
+  radiology: ScanText,
+  pharmacy: Pill,
+  newtest: PlusCircle,
+};
+
 const avatarImg = require("../images/avatar.png");
 const femaleImg = require("../images/female.png");
 
@@ -104,7 +122,7 @@ export default function PatientsScreen() {
   const [aiPatientId, setAiPatientId] = useState<number | null>(null);
 
   // ---------- network / config ----------
-  const LOCAL_IP = "192.168.100.176";
+  const LOCAL_IP = "192.168.100.64";
   const API_BASE =
     Platform.OS === "android"
       ? "http://10.0.2.2:3000"
@@ -427,31 +445,33 @@ export default function PatientsScreen() {
         </View>
 
         {/* Tabs Inside Modal */}
-        <View style={styles.tabRow}>
-          {TABS.map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.tabButton, activeTab === tab && styles.tabActive]}
-              onPress={() => handleTabChange(tab)}
-            >
-              <Text
+        <View style={styles.tabContainer}>
+          {TABS.map((tab) => {
+            const Icon = TAB_ICONS[tab]; // pick icon from mapping
+            return (
+              <TouchableOpacity
+                key={tab}
+                onPress={() => handleTabChange(tab)}
                 style={[
-                  styles.tabText,
-                  activeTab === tab && { color: "#fff", fontWeight: "700" },
+                  styles.cardButton,
+                  activeTab === tab && { opacity: 0.8 },
                 ]}
               >
-                {tab === "notes"
-                  ? "Notes"
-                  : tab === "lab"
-                    ? "Lab"
-                    : tab === "radiology"
-                      ? "Radiology"
-                      : tab === "pharmacy"
-                        ? "Pharmacy"
-                        : "New Test"}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Icon size={16} color="#fff" />
+                <Text style={styles.buttonText}>
+                  {tab === "notes"
+                    ? "Notes"
+                    : tab === "lab"
+                      ? "Lab"
+                      : tab === "radiology"
+                        ? "Radiology"
+                        : tab === "pharmacy"
+                          ? "Pharmacy"
+                          : "New Test"}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* Tab Content */}
@@ -677,26 +697,29 @@ export default function PatientsScreen() {
 
               {/* Existing Tabs */}
               <View style={styles.tabContainer}>
-                {TABS.map((tab) => (
-                  <TouchableOpacity
-                    key={tab}
-                    onPress={() => openModal(item, tab)}
-                    style={styles.cardButton}
-                  >
-                    <FileText size={16} color="#fff" />
-                    <Text style={styles.buttonText}>
-                      {tab === "notes"
-                        ? "Notes"
-                        : tab === "lab"
-                          ? "Lab"
-                          : tab === "radiology"
-                            ? "Radiology"
-                            : tab === "pharmacy"
-                              ? "Pharmacy"
-                              : "New Test"}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {TABS.map((tab) => {
+                  const Icon = TAB_ICONS[tab]; // pick icon from mapping
+                  return (
+                    <TouchableOpacity
+                      key={tab}
+                      onPress={() => openModal(item, tab)}
+                      style={styles.cardButton}
+                    >
+                      <Icon size={16} color="#fff" />
+                      <Text style={styles.buttonText}>
+                        {tab === "notes"
+                          ? "Notes"
+                          : tab === "lab"
+                            ? "Lab"
+                            : tab === "radiology"
+                              ? "Radiology"
+                              : tab === "pharmacy"
+                                ? "Pharmacy"
+                                : "New Test"}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
           )}
@@ -803,20 +826,50 @@ const styles = StyleSheet.create({
   },
   tabContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 8,
+    flexWrap: "wrap", // allows wrapping on smaller screens
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 10,
+    marginVertical: 8,
   },
+
+  // cardButton: {
+  //   flex: 1,
+  //   flexDirection: "row",
+  //   alignItems: "center",
+  //   justifyContent: "center",
+  //   backgroundColor: "#00A652",
+  //   borderRadius: 8,
+  //   paddingVertical: 8,
+  //   marginHorizontal: 2,
+  // },
+
   cardButton: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#00A652",
     borderRadius: 8,
-    paddingVertical: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     marginHorizontal: 2,
+    marginVertical: 2,
+    minWidth: 90,
+    flexShrink: 0, // ❌ prevents shrinking that causes wrapping
+    flexWrap: "nowrap", // ❌ disables wrapping inside button
   },
-  buttonText: { color: "#fff", fontSize: 12, marginLeft: 4 },
+
+  buttonText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+    textAlign: "center",
+    marginLeft: 6,
+    flexShrink: 1,
+    flexWrap: "nowrap", // ❌ disables text wrapping
+    includeFontPadding: false, // tighter vertical spacing (Android fix)
+  },
+
   tabRow: {
     flexDirection: "row",
     justifyContent: "space-between",

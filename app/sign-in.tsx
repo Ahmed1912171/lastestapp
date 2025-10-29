@@ -28,7 +28,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [bgLoaded, setBgLoaded] = useState(false); // ✅ track bg preload
 
-  const LOCAL_IP = "192.168.100.176";
+  const LOCAL_IP = "192.168.100.64";
 
   const API_URL =
     Platform.OS === "android"
