@@ -21,14 +21,14 @@ export default function LoginScreen() {
   const { signIn } = useSession();
   const router = useRouter();
 
-  const [username, setUsername] = useState("1");
-  const [password, setPassword] = useState("admin");
+  const [username, setUsername] = useState("1462");
+  const [password, setPassword] = useState("130481-0429"); // ✅ Empty - user must enter correct password
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [bgLoaded, setBgLoaded] = useState(false); // ✅ track bg preload
 
-  const LOCAL_IP = "192.168.100.64";
+  const LOCAL_IP = "192.168.100.93";
 
   const API_URL =
     Platform.OS === "android"
@@ -57,29 +57,41 @@ export default function LoginScreen() {
 
     try {
       setLoading(true);
-      const res = await axios.get(API_URL);
-      const users: any[] = res.data || [];
+      
+      // ✅ Use POST /login endpoint instead of GET /admin
+      const LOGIN_URL = Platform.OS === "android"
+        ? "http://10.0.2.2:3000/login"
+        : `http://${LOCAL_IP}:3000/login`;
 
-      if (!users.length) {
-        alert("⚠️ No users found in the database");
-        return;
-      }
+      const res = await axios.post(LOGIN_URL, {
+        username,
+        password,
+        branch: "korangi", // Default branch, can be made dynamic later
+      });
 
-      const matchedUser = users.find(
-        (u) =>
-          u.ADMIN_ID?.toString() === username &&
-          u.GR_EMPLOYER_LOGIN === password
-      );
-
-      if (matchedUser) {
-        signIn();
+      if (res.data.success && res.data.user) {
+        const userData = res.data.user;
+        
+        // ✅ Pass complete user data to session (including pinNumber)
+        signIn({
+          ADMIN_ID: userData.ADMIN_ID,
+          GR_EMPLOYER_LOGIN: userData.GR_EMPLOYER_LOGIN,
+          pinNumber: userData.pinNumber,
+          branch: "korangi",
+        });
+        
         router.replace("/");
       } else {
         alert("❌ Invalid Username or Password");
       }
     } catch (err: any) {
       console.error("Login error:", err.message);
-      alert(`Something went wrong: ${err.message}`);
+      
+      if (err.response?.status === 401) {
+        alert("❌ Invalid Username or Password");
+      } else {
+        alert(`Something went wrong: ${err.message}`);
+      }
     } finally {
       setLoading(false);
     }

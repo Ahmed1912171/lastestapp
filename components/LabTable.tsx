@@ -1,13 +1,13 @@
 import axios from "axios";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Dimensions,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  View,
+    ActivityIndicator,
+    Dimensions,
+    Platform,
+    ScrollView,
+    View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context"; // ✅ CORRECT
 
 let WebView: any;
 if (Platform.OS !== "web") {
@@ -27,7 +27,7 @@ const LabTable: React.FC<LabTableProps> = ({ patientId }) => {
     const fetchData = async () => {
       try {
         const { data } = await axios.get(
-          `http:192.168.100.64:3000/patients/${patientId}/lab`
+          `http:192.168.100.93:3000/patients/${patientId}/lab`
         );
 
         if (!data || data.length === 0) {

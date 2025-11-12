@@ -1,20 +1,20 @@
 // AddMedicine.tsx
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+    Alert,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
+import { SafeAreaView } from "react-native-safe-area-context"; // ✅ CORRECT
 
 interface MedicineEntry {
   dosageCount: string | null;
@@ -58,7 +58,7 @@ interface AddMedicineProps {
   patientId: string | number;
 }
 
-const API_BASE_URL = "http://192.168.100.64:3000";
+const API_BASE_URL = "http://192.168.100.93:3000";
 
 const FIELD_LABELS = {
   dosageCount: "Dosage Count*",

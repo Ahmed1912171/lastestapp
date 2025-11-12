@@ -3,14 +3,14 @@ import { useRouter } from "expo-router";
 import { Search } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Image,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -41,7 +41,7 @@ export default function SearchScreen() {
       setLoading(true);
       try {
         const res = await axios.get<Patient[]>(
-          "http://192.168.100.64:3000/search",
+          "http://192.168.100.93:3000/search",
           { params: { query, page: pageNumber, limit: 50 } }
         );
 

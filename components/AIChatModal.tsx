@@ -1,18 +1,18 @@
 import axios from "axios";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Keyboard,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
 } from "react-native";
 
 interface Message {
@@ -27,7 +27,7 @@ interface Props {
   patientId?: number | null;
 }
 
-const BACKEND_BASE = "http://192.168.100.64:3000";
+const BACKEND_BASE = "http://192.168.100.93:3000";
 
 const AIChatModal: React.FC<Props> = ({ visible, onClose, patientId }) => {
   const [messages, setMessages] = useState<Message[]>([]);

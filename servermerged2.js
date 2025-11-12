@@ -28,7 +28,6 @@ console.log(
 // ✅ BRANCH -> DATABASE MAP
 // ==========================
 const branchDBMap = {
-  ho: "convert_april_HO",
   azambasti: "convert_april_azambasti",
   chs: "convert_april_chs",
   jamshoro: "convert_april_jamshoro",
@@ -36,6 +35,7 @@ const branchDBMap = {
   larkana: "convert_april_larkana",
   sba: "convert_april_sba",
   sobhraj: "convert_april_sobhraj",
+  ho: "convert_april_HO",
 };
 
 // ==========================
@@ -124,9 +124,19 @@ app.get(
     // default branch korangi (or pass branch via query to check other DBs)
     const branch = req.query.branch || "korangi";
     const db = await getDb(branch);
+    
+    // ✅ Show only relevant fields for debugging
     const [results] = await db.query(
-      "SELECT ADMIN_ID, GR_EMPLOYER_LOGIN FROM admin"
+      "SELECT ADMIN_ID, GR_EMPLOYER_LOGIN FROM admin LIMIT 10"
     );
+    
+    console.log("📋 Admin Records Found:", results.length);
+    results.forEach((user, idx) => {
+      const hasDash = user.GR_EMPLOYER_LOGIN ? user.GR_EMPLOYER_LOGIN.includes("-") : false;
+      const pinNumber = hasDash ? user.GR_EMPLOYER_LOGIN.split("-")[1] : null;
+      console.log(`${idx + 1}. ADMIN_ID: ${user.ADMIN_ID}, GR_EMPLOYER_LOGIN: "${user.GR_EMPLOYER_LOGIN}", Has Dash: ${hasDash}, PinNumber: ${pinNumber}`);
+    });
+    
     res.json(results);
   })
 );
@@ -134,20 +144,64 @@ app.get(
 app.post(
   "/login",
   safeHandler(async (req, res) => {
-    const branch = req.body.branch || req.query.branch || "korangi";
-    const db = await getDb(branch);
+    // ✅ ALWAYS use Korangi database for login (central admin table)
+    const loginDb = await getDb("korangi");
+    
+    // ✅ But remember which branch user wants to work at
+    const selectedBranch = req.body.branch || req.query.branch || "korangi";
 
     const { username, password } = req.body;
+    
+    console.log("🔐 Login Attempt:", {
+      username,
+      password: password ? `${password.substring(0, 3)}***` : "empty",
+      loginDatabase: "korangi (central)",
+      selectedBranch: selectedBranch
+    });
+    
     if (!username || !password)
       return res.status(400).json({ error: "Missing credentials" });
 
-    const [results] = await db.query(
-      "SELECT ADMIN_ID, GR_EMPLOYER_LOGIN FROM admin_users WHERE ADMIN_ID = ? AND GR_EMPLOYER_LOGIN = ? LIMIT 1",
+    // ✅ Query Korangi database (central admin table)
+    const [results] = await loginDb.query(
+      "SELECT ADMIN_ID, GR_EMPLOYER_LOGIN FROM admin WHERE ADMIN_ID = ? AND GR_EMPLOYER_LOGIN = ? LIMIT 1",
       [username, password]
     );
 
-    if (results.length > 0) res.json({ success: true, user: results[0] });
-    else res.status(401).json({ success: false, error: "Invalid credentials" });
+    if (results.length > 0) {
+      const user = results[0];
+      
+      // ✅ Extract PinNumber from GR_EMPLOYER_LOGIN (format: "270125-1129" → "1129")
+      let pinNumber = null;
+      
+      console.log("✅ Login Success! User found in Korangi DB:", {
+        ADMIN_ID: user.ADMIN_ID,
+        GR_EMPLOYER_LOGIN: user.GR_EMPLOYER_LOGIN,
+        selectedBranch: selectedBranch,
+        hasDash: user.GR_EMPLOYER_LOGIN ? user.GR_EMPLOYER_LOGIN.includes("-") : false
+      });
+      
+      if (user.GR_EMPLOYER_LOGIN && user.GR_EMPLOYER_LOGIN.includes("-")) {
+        pinNumber = user.GR_EMPLOYER_LOGIN.split("-")[1];
+        console.log("✅ PinNumber extracted:", pinNumber);
+      } else {
+        // ⚠️ Fallback: If no dash, use ADMIN_ID as PinNumber
+        pinNumber = String(user.ADMIN_ID);
+        console.log("⚠️ No dash found - using ADMIN_ID as PinNumber:", pinNumber);
+      }
+
+      res.json({ 
+        success: true, 
+        user: {
+          ...user,
+          pinNumber,  // ✅ Add PinNumber to response
+          branch: selectedBranch  // ✅ Include selected branch
+        }
+      });
+    } else {
+      console.log("❌ Login Failed: No matching user found in Korangi DB");
+      res.status(401).json({ success: false, error: "Invalid credentials" });
+    }
   })
 );
 
@@ -719,6 +773,7 @@ app.get(
       larkana: "convert_april_larkana",
       sba: "convert_april_sba",
       sobhraj: "convert_april_sobhraj",
+      ho: "convert_april_HO",
     };
 
     const results = {};
@@ -1054,14 +1109,16 @@ app.get(
 );
 
 // ==========================
-// 🔹 BOOK MULTIPLE TESTS (JS version)
+// 🔹 BOOK MULTIPLE TESTS (JS version) — UPDATED
 // ==========================
 app.post(
   "/book-tests",
   safeHandler(async (req, res) => {
-    const { tests = [], branch = "korangi", Order_Id } = req.body;
+    const { tests = [], branch = "korangi", Order_Id, Patient_ID } = req.body;
 
     if (!Order_Id) return res.status(400).json({ error: "Order_Id missing" });
+    if (!Patient_ID)
+      return res.status(400).json({ error: "Patient_ID missing" });
     if (!Array.isArray(tests) || tests.length === 0) {
       return res.status(400).json({ error: "No tests provided" });
     }
@@ -1077,16 +1134,22 @@ app.post(
         const { TestID, Pkod_detail, Barcode_no } = t;
 
         await db.query(
-          `INSERT INTO a_order_detail (Order_Id, TestID, Pkod_detail, Barcode_no)
-           VALUES (?, ?, ?, ?)`,
-          [Order_Id, TestID, Pkod_detail, Barcode_no]
+          `INSERT INTO a_order_detail (Order_Id, Patient_ID, TestID, Pkod_detail, Barcode_no)
+           VALUES (?, ?, ?, ?, ?)`,
+          [Order_Id, Patient_ID, TestID, Pkod_detail, Barcode_no]
         );
 
-        inserted.push({ Order_Id, TestID, Pkod_detail, Barcode_no });
+        inserted.push({
+          Order_Id,
+          Patient_ID,
+          TestID,
+          Pkod_detail,
+          Barcode_no,
+        });
       }
 
       await db.commit();
-      res.json({ success: true, Order_Id, records: inserted });
+      res.json({ success: true, Order_Id, Patient_ID, records: inserted });
     } catch (err) {
       await db.rollback();
       console.error(err);
@@ -1151,6 +1214,430 @@ app.post(
     }
 
     res.json({ success: true, generated });
+  })
+);
+
+// ==========================
+// 🕐 ATTENDANCE ENDPOINTS
+// ==========================
+
+// ✅ Get attendance history for a user
+app.get(
+  "/attendance/:pinNumber",
+  safeHandler(async (req, res) => {
+    const branch = req.query.branch || "korangi";
+    const db = await getDb(branch);
+    const { pinNumber } = req.params;
+    const limit = parseInt(req.query.limit) || 30;
+
+    // ✅ Remove leading zeros from PinNumber
+    const pinNumberInt = parseInt(pinNumber, 10);
+
+    console.log("📥 Fetching attendance history:", {
+      pinNumber,
+      pinNumberInt,
+      branch,
+      limit
+    });
+
+    const [results] = await db.query(
+      `SELECT 
+        AttendanceID,
+        PinNumber,
+        DATE_FORMAT(AttendanceDate, '%Y-%m-%d') AS AttendanceDate,
+        AttendanceTime,
+        timeIn,
+        timeOut,
+        Status,
+        MachineName,
+        AttendanceDateTime
+      FROM as_attendance
+      WHERE PinNumber = ?
+      ORDER BY AttendanceDate DESC, AttendanceTime DESC
+      LIMIT ?`,
+      [pinNumberInt, limit]
+    );
+
+    console.log("📊 Found records:", results.length);
+    if (results.length > 0) {
+      console.log("📋 First record:", results[0]);
+    }
+
+    res.json(results);
+  })
+);
+
+// ✅ Mark attendance (Time In)
+app.post(
+  "/attendance/mark",
+  safeHandler(async (req, res) => {
+    const branch = req.body.branch || req.query.branch || "korangi";
+    const db = await getDb(branch);
+
+    const { pinNumber } = req.body;
+
+    if (!pinNumber) {
+      return res.status(400).json({ error: "PinNumber is required" });
+    }
+
+    const now = new Date();
+    const dateStr = now.toISOString().split("T")[0]; // 2025-11-11
+    const timeStr24 = now.toTimeString().split(" ")[0]; // 14:30:45
+    const dateTimeStr = now.toISOString().slice(0, 19).replace("T", " "); // 2025-11-11 14:30:45
+    
+    // ✅ Format time as "HH:MM AM/PM" for AttendanceTime column
+    const hours = now.getHours();
+    const minutes = now.getMinutes().toString().padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    const displayHour = hours % 12 || 12;
+    const formattedTime = `${displayHour.toString().padStart(2, "0")}:${minutes} ${ampm}`; // "05:09 PM"
+    
+    // ✅ CONSTANT values for timeIn and timeOut
+    const timeInShort = "08:15";
+    const timeOutShort = "15:55";
+
+    // ✅ Remove leading zeros from PinNumber (store as integer)
+    const pinNumberInt = parseInt(pinNumber, 10);
+
+    // ✅ Check if late: After 9:15 AM
+    const totalMinutes = hours * 60 + parseInt(minutes);
+    const cutoffMinutes = 9 * 60 + 15; // 9:15 AM = 555 minutes
+    const isLate = totalMinutes > cutoffMinutes;
+    
+    console.log("⏰ Time Check:", {
+      currentTime: `${hours}:${minutes}`,
+      totalMinutes,
+      cutoffMinutes,
+      isLate
+    });
+
+    // ✅ Check if already marked today
+    const [existing] = await db.query(
+      `SELECT AttendanceID, timeIn, timeOut, Status 
+       FROM as_attendance 
+       WHERE PinNumber = ? AND AttendanceDate = ?
+       ORDER BY AttendanceID DESC
+       LIMIT 1`,
+      [pinNumberInt, dateStr]
+    );
+
+    if (existing.length > 0) {
+      // ✅ Already marked today - return existing record
+      return res.json({
+        success: true,
+        message: "Attendance already marked today",
+        alreadyMarked: true,
+        attendance: existing[0],
+        isLate: existing[0].Status === 1 ? isLate : undefined, // Return late status for existing record
+      });
+    }
+
+    // ✅ Get next AttendanceID manually (since auto-increment might not be working)
+    const [[{ maxId }]] = await db.query(
+      `SELECT COALESCE(MAX(AttendanceID), 0) + 1 AS maxId FROM as_attendance`
+    );
+
+    console.log("🔢 Next AttendanceID:", maxId);
+
+    // ✅ Insert new attendance record with explicit AttendanceID
+    // Status: 1 = Check In (Time In)
+    const [result] = await db.query(
+      `INSERT INTO as_attendance (
+        AttendanceID,
+        PinNumber,
+        AttendanceDate,
+        AttendanceTime,
+        AttendanceDateTime,
+        timeIn,
+        timeOut,
+        Status,
+        MachineName,
+        MachineID,
+        \`Read\`,
+        sync_status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        maxId,               // Explicit AttendanceID
+        pinNumberInt,        // 429 (integer, not "0429")
+        dateStr,             // 2025-11-11
+        formattedTime,       // "05:09 PM"
+        dateTimeStr,         // 2025-11-11 17:09:42
+        timeInShort,         // "08:15"
+        timeOutShort,        // "15:55"
+        1,                   // Status: 1 = Check In
+        "mobile app",        // MachineName
+        1,                   // MachineID (always 1 for mobile app)
+        0,                   // Read
+        0,                   // sync_status
+      ]
+    );
+
+    console.log("✅ Attendance inserted:", {
+      AttendanceID: maxId,
+      PinNumber: pinNumberInt,
+      Status: 1,
+      timeIn: timeInShort,
+      isLate,
+      insertResult: result
+    });
+
+    res.json({
+      success: true,
+      message: isLate 
+        ? "⚠️ Time In marked - LATE (After 9:15 AM)" 
+        : "✅ Time In marked - ON TIME",
+      attendanceId: maxId,
+      status: 1,
+      timeIn: timeInShort,
+      date: dateStr,
+      isLate,
+      statusText: isLate ? "Late" : "On Time"
+    });
+  })
+);
+
+// ✅ Mark Time Out (NEW: Insert separate entry instead of update)
+app.post(
+  "/attendance/timeout",
+  safeHandler(async (req, res) => {
+    const branch = req.body.branch || req.query.branch || "korangi";
+    const db = await getDb(branch);
+
+    const { pinNumber } = req.body;
+
+    console.log("🔄 Time Out Request:", { pinNumber, branch });
+
+    if (!pinNumber) {
+      return res.status(400).json({ error: "PinNumber is required" });
+    }
+
+    const now = new Date();
+    const dateStr = now.toISOString().split("T")[0];
+    const dateTimeStr = now.toISOString().slice(0, 19).replace("T", " ");
+    
+    // ✅ Get actual time for late/early detection
+    const hours = now.getHours();
+    const minutes = now.getMinutes().toString().padStart(2, "0");
+    
+    // ✅ CONSTANT values for timeIn and timeOut
+    const timeInShort = "08:15";
+    const timeOutShort = "15:55";
+    
+    // ✅ Format time as "HH:MM AM/PM" for AttendanceTime column
+    const ampm = hours >= 12 ? "PM" : "AM";
+    const displayHour = hours % 12 || 12;
+    const formattedTime = `${displayHour.toString().padStart(2, "0")}:${minutes} ${ampm}`;
+
+    // ✅ Remove leading zeros from PinNumber
+    const pinNumberInt = parseInt(pinNumber, 10);
+
+    // ✅ Check if left early: Before 4:55 PM (16:55)
+    const totalMinutes = hours * 60 + parseInt(minutes);
+    const endTimeMinutes = 16 * 60 + 55; // 4:55 PM = 1015 minutes
+    const leftEarly = totalMinutes < endTimeMinutes;
+    
+    console.log("⏰ Check Out Time Check:", {
+      currentTime: `${hours}:${minutes}`,
+      totalMinutes,
+      endTimeMinutes,
+      leftEarly
+    });
+
+    // ✅ Check if user already checked in today
+    const [existing] = await db.query(
+      `SELECT AttendanceID, Status 
+       FROM as_attendance 
+       WHERE PinNumber = ? AND AttendanceDate = ? AND Status = 1
+       ORDER BY AttendanceID DESC
+       LIMIT 1`,
+      [pinNumberInt, dateStr]
+    );
+
+    if (existing.length === 0) {
+      console.log("❌ No check-in record found");
+      return res.status(404).json({ 
+        error: "No check-in record found for today. Please Check In first." 
+      });
+    }
+
+    // ✅ Check if already checked out today
+    const [checkoutRecord] = await db.query(
+      `SELECT AttendanceID 
+       FROM as_attendance 
+       WHERE PinNumber = ? AND AttendanceDate = ? AND Status = 2
+       ORDER BY AttendanceID DESC
+       LIMIT 1`,
+      [pinNumberInt, dateStr]
+    );
+
+    if (checkoutRecord.length > 0) {
+      console.log("⚠️ Already checked out today");
+      return res.json({
+        success: true,
+        message: "Time Out already marked",
+        alreadyMarked: true,
+        status: 2
+      });
+    }
+
+    // ✅ Get next AttendanceID
+    const [[{ maxId }]] = await db.query(
+      `SELECT COALESCE(MAX(AttendanceID), 0) + 1 AS maxId FROM as_attendance`
+    );
+
+    console.log("🔢 Next AttendanceID for checkout:", maxId);
+
+    // ✅ INSERT new entry for Check Out (Status = 2)
+    const [result] = await db.query(
+      `INSERT INTO as_attendance (
+        AttendanceID,
+        PinNumber,
+        AttendanceDate,
+        AttendanceTime,
+        AttendanceDateTime,
+        timeIn,
+        timeOut,
+        Status,
+        MachineName,
+        MachineID,
+        \`Read\`,
+        sync_status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        maxId,
+        pinNumberInt,
+        dateStr,
+        formattedTime,
+        dateTimeStr,
+        timeInShort,       // "08:15"
+        timeOutShort,      // "15:55"
+        2,                 // Status: 2 = Check Out
+        "mobile app",
+        1,
+        0,
+        0,
+      ]
+    );
+
+    console.log("✅ Check Out entry inserted:", {
+      AttendanceID: maxId,
+      PinNumber: pinNumberInt,
+      Status: 2,
+      timeOut: timeOutShort,
+      leftEarly
+    });
+
+    res.json({
+      success: true,
+      message: leftEarly
+        ? "⚠️ Time Out marked - LEFT EARLY (Before 4:55 PM)"
+        : "✅ Time Out marked - FULL DAY",
+      timeOut: timeOutShort,
+      status: 2,
+      attendanceId: maxId,
+      leftEarly,
+      statusText: leftEarly ? "Left Early" : "Full Day"
+    });
+  })
+);
+
+// ✅ Get attendance statistics
+app.get(
+  "/attendance/:pinNumber/stats",
+  safeHandler(async (req, res) => {
+    const branch = req.query.branch || "korangi";
+    const db = await getDb(branch);
+    const { pinNumber } = req.params;
+
+    // ✅ Remove leading zeros from PinNumber
+    const pinNumberInt = parseInt(pinNumber, 10);
+
+    // ✅ Get all attendance records to calculate Late/Early days
+    const [records] = await db.query(
+      `SELECT 
+        AttendanceDate,
+        timeIn,
+        timeOut,
+        Status
+      FROM as_attendance
+      WHERE PinNumber = ?
+      ORDER BY AttendanceDate DESC`,
+      [pinNumberInt]
+    );
+
+    // ✅ Group records by date (since we have 2 records per day now: Status=1 and Status=2)
+    const dateMap = new Map();
+    
+    records.forEach((record) => {
+      const date = record.AttendanceDate;
+      if (!dateMap.has(date)) {
+        dateMap.set(date, { checkIn: null, checkOut: null });
+      }
+      
+      const dayData = dateMap.get(date);
+      if (record.Status === 1) {
+        dayData.checkIn = record;
+      } else if (record.Status === 2) {
+        dayData.checkOut = record;
+      }
+    });
+
+    let totalDays = 0;
+    let lateDays = 0;
+    let onTimeDays = 0;
+    let leftEarlyDays = 0;
+    let fullDays = 0;
+
+    // ✅ Calculate stats: Only count days with at least a check-in
+    dateMap.forEach((dayData, date) => {
+      if (dayData.checkIn) {
+        totalDays++;
+
+        // Check if late (after 9:15 AM)
+        if (dayData.checkIn.timeIn) {
+          const [hours, minutes] = dayData.checkIn.timeIn.split(":").map(Number);
+          const totalMinutes = hours * 60 + minutes;
+          const cutoffMinutes = 9 * 60 + 15; // 9:15 AM
+          
+          if (totalMinutes > cutoffMinutes) {
+            lateDays++;
+          } else {
+            onTimeDays++;
+          }
+        }
+
+        // Check if left early (before 4:55 PM) - only if checked out
+        if (dayData.checkOut && dayData.checkOut.timeOut) {
+          const [hours, minutes] = dayData.checkOut.timeOut.split(":").map(Number);
+          const totalMinutes = hours * 60 + minutes;
+          const endTimeMinutes = 16 * 60 + 55; // 4:55 PM
+          
+          if (totalMinutes < endTimeMinutes) {
+            leftEarlyDays++;
+          } else {
+            fullDays++;
+          }
+        }
+      }
+    });
+
+    console.log("📊 Attendance Stats:", {
+      totalDays,
+      lateDays,
+      onTimeDays,
+      leftEarlyDays,
+      fullDays
+    });
+    
+    res.json({ 
+      totalDays,
+      lateDays,
+      onTimeDays,
+      leftEarlyDays,
+      fullDays,
+      checkIns: records.filter(r => r.Status === 1).length,
+      checkOuts: records.filter(r => r.Status === 2).length
+    });
   })
 );
 

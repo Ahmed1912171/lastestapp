@@ -1,11 +1,19 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
-type Session = { user: string } | null;
+// ✅ Enhanced user data type
+type UserData = {
+  ADMIN_ID: string;
+  GR_EMPLOYER_LOGIN: string;
+  pinNumber: string | null;
+  branch?: string;
+};
+
+type Session = { user: UserData } | null;
 
 type AuthContextType = {
   session: Session;
   isLoading: boolean;
-  signIn: () => void;
+  signIn: (userData: UserData) => void;
   signOut: () => void;
 };
 
@@ -18,6 +26,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const loadSession = async () => {
       setIsLoading(true);
+      // TODO: Load saved session from AsyncStorage
       await new Promise((r) => setTimeout(r, 1000));
       setIsLoading(false);
     };
@@ -29,7 +38,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       value={{
         session,
         isLoading,
-        signIn: () => setSession({ user: "demo-user" }),
+        signIn: (userData: UserData) => setSession({ user: userData }),
         signOut: () => setSession(null),
       }}
     >

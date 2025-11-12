@@ -4,39 +4,40 @@ import NewTestRegistration from "@/components/NewTestRegistration";
 import PharmacyTable from "@/components/PharmacyTable";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
-import { Bot, FileText, Send } from "lucide-react-native";
+import { Bot, ClipboardList, FileText, Send } from "lucide-react-native";
 import React, {
-  ReactNode,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
+    ReactNode,
+    useCallback,
+    useEffect,
+    useRef,
+    useState,
 } from "react";
 import {
-  ActivityIndicator,
-  Dimensions,
-  FlatList,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Dimensions,
+    FlatList,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import Modal from "react-native-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 
+import Results from "@/components/Results";
 import {
-  Pill,
-  PlusCircle,
-  ScanText,
-  TestTubeDiagonal,
+    Pill,
+    PlusCircle,
+    ScanText,
+    TestTubeDiagonal,
 } from "lucide-react-native";
 
 const TAB_ICONS: Record<
@@ -48,6 +49,7 @@ const TAB_ICONS: Record<
   radiology: ScanText,
   pharmacy: Pill,
   newtest: PlusCircle,
+  results: ClipboardList,
 };
 
 const avatarImg = require("../images/avatar.png");
@@ -96,7 +98,14 @@ type Radiology = {
   short_history: string;
 };
 
-const TABS = ["notes", "lab", "radiology", "pharmacy", "newtest"] as const;
+const TABS = [
+  "notes",
+  "lab",
+  "radiology",
+  "pharmacy",
+  "newtest",
+  "results",
+] as const;
 
 type TabType = (typeof TABS)[number];
 
@@ -122,7 +131,7 @@ export default function PatientsScreen() {
   const [aiPatientId, setAiPatientId] = useState<number | null>(null);
 
   // ---------- network / config ----------
-  const LOCAL_IP = "192.168.100.64";
+  const LOCAL_IP = "192.168.100.93";
   const API_BASE =
     Platform.OS === "android"
       ? "http://10.0.2.2:3000"
@@ -467,7 +476,11 @@ export default function PatientsScreen() {
                         ? "Radiology"
                         : tab === "pharmacy"
                           ? "Pharmacy"
-                          : "New Test"}
+                          : tab === "newtest"
+                            ? "New Test"
+                            : tab === "results"
+                              ? "Results"
+                              : ""}
                 </Text>
               </TouchableOpacity>
             );
@@ -572,6 +585,16 @@ export default function PatientsScreen() {
                 gender: selectedPatient.GENDER,
               }}
               branch={branch}
+            />
+          )}
+
+          {activeTab === "results" && selectedPatient && (
+            <Results
+              tests={["Hemoglobin", "WBC", "Platelets"]}
+              onSave={(values) => {
+                console.log("Saved Values:", values);
+                // TODO: call API here later
+              }}
             />
           )}
         </View>
@@ -715,7 +738,11 @@ export default function PatientsScreen() {
                               ? "Radiology"
                               : tab === "pharmacy"
                                 ? "Pharmacy"
-                                : "New Test"}
+                                : tab === "newtest"
+                                  ? "New Test"
+                                  : tab === "results"
+                                    ? "Results"
+                                    : ""}
                       </Text>
                     </TouchableOpacity>
                   );

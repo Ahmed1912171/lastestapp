@@ -9,7 +9,6 @@ export default function AppLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      {" "}
       {/* ✅ Wrap everything */}
       <Tabs
         screenOptions={{

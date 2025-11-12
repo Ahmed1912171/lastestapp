@@ -1,18 +1,18 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
 } from "react-native";
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
+import { SafeAreaView } from "react-native-safe-area-context"; // ✅ CORRECT
 
 type Props = {
   patient: {
@@ -57,7 +57,7 @@ export default function NewTestRegistration({ patient, branch }: Props) {
   const scrollRef = useRef<ScrollView | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const API_BASE = "http://192.168.100.64:3000";
+  const API_BASE = "http://192.168.100.93:3000";
   const DEBOUNCE = 250;
 
   async function fetchJsonSafe(url: string, opts?: RequestInit) {
@@ -231,7 +231,7 @@ export default function NewTestRegistration({ patient, branch }: Props) {
                 <Text style={[styles.cellHeader, { width: 50 }]}>S.No</Text>
                 <Text style={[styles.cellHeader, { flex: 1 }]}>TestID</Text>
                 <Text style={[styles.cellHeader, { flex: 2 }]}>Test Title</Text>
-                <Text style={[styles.cellHeader, { width: 40 }]}>✕</Text>
+                <Text style={[styles.cellHeader, { width: 40 }]}></Text>
               </View>
 
               {selectedTests.map((r, index) => (

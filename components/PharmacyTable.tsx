@@ -1,19 +1,19 @@
 import axios from "axios";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  Modal,
-  Platform,
-  RefreshControl,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    Modal,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context"; // ✅ CORRECT
 import AddMedicine from "./Addmedicine";
 
 let WebView: any;
@@ -35,7 +35,7 @@ const PharmacyTable: React.FC<PharmacyTableProps> = ({ patientId }) => {
   const fetchData = useCallback(async () => {
     try {
       const { data } = await axios.get(
-        `http://192.168.100.64:3000/tr_pharmacy_store_request?patientId=${patientId}`
+        `http://192.168.100.93:3000/tr_pharmacy_store_request?patientId=${patientId}`
       );
 
       const activeMeds = (data || []).filter(

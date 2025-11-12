@@ -2,13 +2,13 @@ import axios from "axios";
 import { Stack, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -57,7 +57,7 @@ export default function PatientDetailScreen() {
   );
   const [notes, setNotes] = useState<Note[]>([]);
   const [radiologyReports, setRadiologyReports] = useState<Radiology[]>([]);
-  const LOCAL_IP = "192.168.100.64";
+  const LOCAL_IP = "192.168.100.93";
 
   // 🔹 Fetch patient data
   useEffect(() => {

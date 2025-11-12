@@ -2,22 +2,25 @@
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import {
-  Activity,
-  Bed,
-  TestTubes,
-  TrendingUp,
-  Users,
+    Activity,
+    Bed,
+    BedSingle,
+    Hospital,
+    TestTubes,
+    TrendingUp,
+    Users,
+    Warehouse,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -62,7 +65,7 @@ export default function Dashboard() {
   const [testCount, setTestCount] = useState<number | null>(null);
   const [loadingCount, setLoadingCount] = useState(false);
 
-  const LOCAL_IP = "192.168.100.64";
+  const LOCAL_IP = "192.168.100.93";
 
   // ---------- Dynamic Date ----------
   useEffect(() => {
@@ -132,8 +135,9 @@ export default function Dashboard() {
         "Sobhraj",
         "Sukkur",
         "Larkana",
-        "Hyderabad",
-        "Nawabshah",
+        "Jamshoro",
+        "Sba",
+        "Ho",
       ];
       setBranches(branchList);
       setSelectedBranch(branchList[0]);
@@ -317,8 +321,10 @@ export default function Dashboard() {
           {/* Branch */}
           <View style={styles.statCard}>
             <View style={styles.statRow}>
-              <View style={styles.iconWrapper}>
-                <Activity size={20} />
+              <View
+                style={[styles.iconWrapper, { backgroundColor: "#d5e49eff" }]}
+              >
+                <Hospital size={20} />
               </View>
               <View>
                 <Text style={styles.statLabel}>Branch</Text>
@@ -330,8 +336,10 @@ export default function Dashboard() {
           {/* Ward */}
           <View style={styles.statCard}>
             <View style={styles.statRow}>
-              <View style={styles.iconWrapper}>
-                <Users size={20} />
+              <View
+                style={[styles.iconWrapper, { backgroundColor: "#96eba2ff" }]}
+              >
+                <Warehouse size={20} />
               </View>
               <View style={{ flex: 1, flexShrink: 1 }}>
                 <Text style={styles.statLabel}>Ward</Text>
@@ -345,7 +353,9 @@ export default function Dashboard() {
           {/* Occupied */}
           <View style={styles.statCard}>
             <View style={styles.statRow}>
-              <View style={styles.iconWrapper}>
+              <View
+                style={[styles.iconWrapper, { backgroundColor: "#93c0baff" }]}
+              >
                 <Bed size={20} />
               </View>
               <View>
@@ -361,9 +371,9 @@ export default function Dashboard() {
           <View style={styles.statCard}>
             <View style={styles.statRow}>
               <View
-                style={[styles.iconWrapper, { backgroundColor: "#d1fae5" }]}
+                style={[styles.iconWrapper, { backgroundColor: "#92a8ccff" }]}
               >
-                <Bed size={20} color="#10b981" />
+                <BedSingle size={20} color="#000000ff" />
               </View>
               <View>
                 <Text style={styles.statLabel}>Available</Text>
@@ -378,9 +388,9 @@ export default function Dashboard() {
           <View style={styles.statCard}>
             <View style={styles.statRow}>
               <View
-                style={[styles.iconWrapper, { backgroundColor: "#fde68a" }]}
+                style={[styles.iconWrapper, { backgroundColor: "#c284baff" }]}
               >
-                <Activity size={20} color="#f59e0b" />
+                <Users size={20} color="#000000ff" />
               </View>
               <View>
                 <Text style={styles.statLabel}>Current Patients</Text>
@@ -395,9 +405,9 @@ export default function Dashboard() {
           <View style={styles.statCard}>
             <View style={styles.statRow}>
               <View
-                style={[styles.iconWrapper, { backgroundColor: "#fca5a5" }]}
+                style={[styles.iconWrapper, { backgroundColor: "#6b9e7fff" }]}
               >
-                <Activity size={20} color="#b91c1c" />
+                <Activity size={20} color="#000000ff" />
               </View>
               <View>
                 <Text style={styles.statLabel}>Total Treated</Text>
@@ -412,14 +422,14 @@ export default function Dashboard() {
           <View style={styles.statCard}>
             <View style={styles.statRow}>
               <View
-                style={[styles.iconWrapper, { backgroundColor: "#cecbdbff" }]}
+                style={[styles.iconWrapper, { backgroundColor: "#c2bb7dff" }]}
               >
-                <TestTubes size={20} color="#1b6115ff" />
+                <TestTubes size={20} color="#000000ff" />
               </View>
               <View>
                 <Text style={styles.statLabel}>Total Tests</Text>
                 {loadingCount ? (
-                  <ActivityIndicator color="#1b6115ff" size="small" />
+                  <ActivityIndicator color="#000000ff" size="small" />
                 ) : (
                   <Text style={styles.statValue}>
                     {testCount !== null ? testCount : "N/A"}
