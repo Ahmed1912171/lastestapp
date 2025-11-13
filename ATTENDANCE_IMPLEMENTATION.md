@@ -315,7 +315,7 @@ WHERE ADMIN_ID = ? AND GR_EMPLOYER_LOGIN = ?
 
 3. **Mobile App Configuration**
    - Android Emulator: `http://10.0.2.2:3000`
-   - Physical Device: `http://192.168.100.93:3000`
+   - Physical Device: `http://192.168.100.117:3000`
    - Update `LOCAL_IP` in code if needed
 
 ---

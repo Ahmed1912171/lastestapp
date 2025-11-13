@@ -57,7 +57,7 @@ export default function PatientDetailScreen() {
   );
   const [notes, setNotes] = useState<Note[]>([]);
   const [radiologyReports, setRadiologyReports] = useState<Radiology[]>([]);
-  const LOCAL_IP = "192.168.100.93";
+  const LOCAL_IP = "192.168.100.117";
 
   // 🔹 Fetch patient data
   useEffect(() => {

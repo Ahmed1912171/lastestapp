@@ -57,7 +57,7 @@ export default function NewTestRegistration({ patient, branch }: Props) {
   const scrollRef = useRef<ScrollView | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const API_BASE = "http://192.168.100.93:3000";
+  const API_BASE = "http://192.168.100.117:3000";
   const DEBOUNCE = 250;
 
   async function fetchJsonSafe(url: string, opts?: RequestInit) {

@@ -1,13 +1,15 @@
 // app/(tabs)/attendance.tsx
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
+import * as Device from "expo-device";
 import * as Location from "expo-location";
 import {
-  Activity,
   Calendar,
+  CalendarX,
   Clock,
   LogOut,
   MapPin,
-  UserCheck,
+  UserCheck
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -160,8 +162,8 @@ type Stats = {
   totalDays: number;
   lateDays: number;
   onTimeDays: number;
-  leftEarlyDays?: number;
-  fullDays?: number;
+  leftEarlyDays: number;
+  fullDays: number;
 };
 
 export default function AttendanceScreen() {
@@ -171,6 +173,8 @@ export default function AttendanceScreen() {
     totalDays: 0,
     lateDays: 0,
     onTimeDays: 0,
+    leftEarlyDays: 0,
+    fullDays: 0,
   });
   const [isPresent, setIsPresent] = useState(false);
   const [hasTimeOut, setHasTimeOut] = useState(false);
@@ -183,9 +187,10 @@ export default function AttendanceScreen() {
     latitude: number;
     longitude: number;
   } | null>(null);
+  const [selectedFilter, setSelectedFilter] = useState<'total' | 'ontime' | 'late' | 'early'>('total');
 
   // ✅ API Configuration
-  const LOCAL_IP = "192.168.100.93";
+  const LOCAL_IP = "192.168.100.117";
   const API_BASE =
     Platform.OS === "android"
       ? "http://10.0.2.2:3000"
@@ -197,6 +202,24 @@ export default function AttendanceScreen() {
 
   // ✅ Store which branches user is near
   const [nearbyBranches, setNearbyBranches] = useState<string[]>([]);
+
+  // ✅ Get or generate unique device ID (IMEI alternative)
+  const getDeviceId = async (): Promise<string> => {
+    try {
+      // Check if we already have a stored device ID
+      let deviceId = await AsyncStorage.getItem('DEVICE_UNIQUE_ID');
+      
+      if (!deviceId) {
+        // Generate a new unique ID and store it
+        deviceId = `${Platform.OS}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        await AsyncStorage.setItem('DEVICE_UNIQUE_ID', deviceId);
+      }
+      
+      return deviceId;
+    } catch {
+      return 'unknown-device';
+    }
+  };
 
   // 🗺️ Request location permissions and check ALL branch locations
   useEffect(() => {
@@ -334,7 +357,14 @@ export default function AttendanceScreen() {
       const res = await axios.get(
         `${API_BASE}/attendance/${pinNumber}/stats?branch=${branch}`
       );
-      setStats(res.data || { totalDays: 0, lateDays: 0, onTimeDays: 0 });
+      console.log("📊 Stats received from backend:", res.data);
+      setStats(res.data || { 
+        totalDays: 0, 
+        lateDays: 0, 
+        onTimeDays: 0,
+        leftEarlyDays: 0,
+        fullDays: 0
+      });
     } catch (err) {
       console.error("Error fetching stats:", err);
     }
@@ -384,10 +414,18 @@ export default function AttendanceScreen() {
 
     setLoading(true);
     try {
+      // ✅ Get device information
+      const deviceName = `${Device.manufacturer || ''} ${Device.modelName || 'Unknown Device'}`.trim();
+      const deviceId = await getDeviceId();
+      
       console.log("📤 Sending check-in request...");
+      console.log("📱 Device Info:", { deviceName, deviceId });
+      
       const res = await axios.post(`${API_BASE}/attendance/mark`, {
         pinNumber,
         branch,
+        deviceName,
+        imei: deviceId, // Unique device identifier
       });
 
       console.log("📥 Check-in response:", res.data);
@@ -483,10 +521,18 @@ export default function AttendanceScreen() {
   const performCheckOut = async () => {
     setLoading(true);
     try {
+      // ✅ Get device information
+      const deviceName = `${Device.manufacturer || ''} ${Device.modelName || 'Unknown Device'}`.trim();
+      const deviceId = await getDeviceId();
+      
       console.log("📤 Sending check-out request...");
+      console.log("📱 Device Info:", { deviceName, deviceId });
+      
       const res = await axios.post(`${API_BASE}/attendance/timeout`, {
         pinNumber,
         branch,
+        deviceName,
+        imei: deviceId, // Unique device identifier
       });
 
       console.log("📥 Check-out response:", res.data);
@@ -623,21 +669,17 @@ export default function AttendanceScreen() {
           style={{
             paddingHorizontal: 16,
             marginBottom: 8,
-            backgroundColor: isWithinGeofence ? "#dcfce7" : "#fee2e2",
             padding: 12,
-            borderRadius: 8,
-            borderWidth: 2,
-            borderColor: isWithinGeofence ? "#10b981" : "#ef4444",
           }}
         >
-          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
-            <MapPin size={18} color={isWithinGeofence ? "#10b981" : "#ef4444"} />
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+            <MapPin size={18} color="#666" />
             <Text
               style={{
-                fontSize: 13,
-                fontWeight: "700",
+                fontSize: 14,
+                fontWeight: "600",
                 marginLeft: 6,
-                color: isWithinGeofence ? "#065f46" : "#991b1b",
+                color: "#333",
               }}
             >
               {locationStatus}
@@ -707,80 +749,140 @@ export default function AttendanceScreen() {
               )}
             </TouchableOpacity>
           </View>
-
-          {/* Current Time Display */}
-          <View style={styles.timeDisplay}>
-            <Clock size={16} color="#666" />
-            <Text style={styles.timeText}> Current Time: {currentTime}</Text>
-          </View>
         </View>
 
-        {/* Stats Dashboard */}
+        {/* Stats Dashboard - Filters */}
         <View style={styles.statsContainer}>
           <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Activity size={20} color="#10b981" />
-              <Text style={styles.statLabel}>Total Days</Text>
+            <TouchableOpacity 
+              style={[styles.statCard, selectedFilter === 'total' && styles.statCardActive]}
+              onPress={() => setSelectedFilter('total')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.iconWrapper, { backgroundColor: "#d5e49eff" }]}>
+                <Calendar size={16} color="#000" />
+              </View>
+              <Text style={styles.statLabel}>Total</Text>
               <Text style={styles.statValue}>{stats.totalDays}</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Clock size={20} color="#10b981" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.statCard, selectedFilter === 'ontime' && styles.statCardActive]}
+              onPress={() => setSelectedFilter('ontime')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.iconWrapper, { backgroundColor: "#96eba2ff" }]}>
+                <Clock size={16} color="#000" />
+              </View>
               <Text style={styles.statLabel}>On Time</Text>
               <Text style={styles.statValue}>{stats.onTimeDays}</Text>
-            </View>
-          </View>
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Calendar size={20} color="#ef4444" />
-              <Text style={styles.statLabel}>Late Days</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.statCard, selectedFilter === 'late' && styles.statCardActive]}
+              onPress={() => setSelectedFilter('late')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.iconWrapper, { backgroundColor: "#fecaca" }]}>
+                <CalendarX size={16} color="#000" />
+              </View>
+              <Text style={styles.statLabel}>Late</Text>
               <Text style={styles.statValue}>{stats.lateDays}</Text>
-            </View>
-            <View style={styles.statCard}>
-              <LogOut size={20} color="#f59e0b" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.statCard, selectedFilter === 'early' && styles.statCardActive]}
+              onPress={() => setSelectedFilter('early')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.iconWrapper, { backgroundColor: "#fef3c7" }]}>
+                <LogOut size={16} color="#000" />
+              </View>
               <Text style={styles.statLabel}>Left Early</Text>
-              <Text style={styles.statValue}>{stats.leftEarlyDays || 0}</Text>
-            </View>
+              <Text style={styles.statValue}>{stats.leftEarlyDays}</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
         {/* Attendance History List */}
         <View style={{ paddingHorizontal: 16 }}>
-        {attendanceLogs.length === 0 ? (
-          <Text style={{ textAlign: "center", color: "#666", marginTop: 40 }}>
-            No attendance records found. Pull to refresh.
-          </Text>
-        ) : (
-          attendanceLogs.map((log) => {
-            // ✅ Status: 0 = initial, 1 = Check In, 2 = Check Out
-            const statusText =
-              log.Status === 2
-                ? "Checked Out"
-                : log.Status === 1
-                  ? "Checked In"
-                  : "Pending";
-            const statusColor =
-              log.Status === 2
-                ? "#10b981"
-                : log.Status === 1
-                  ? "#3b82f6"
-                  : "#999";
+        {(() => {
+          // ✅ Group logs by date
+          const groupedByDate = new Map<string, { checkIn: AttendanceLog | null; checkOut: AttendanceLog | null }>();
+          
+          attendanceLogs.forEach((log) => {
+            const dateStr = new Date(log.AttendanceDate).toISOString().split('T')[0];
+            
+            if (!groupedByDate.has(dateStr)) {
+              groupedByDate.set(dateStr, { checkIn: null, checkOut: null });
+            }
+            
+            const dayData = groupedByDate.get(dateStr)!;
+            if (log.Status === 1) {
+              dayData.checkIn = log;
+            } else if (log.Status === 2) {
+              dayData.checkOut = log;
+            }
+          });
 
-            // ✅ Check if late or left early based on actual AttendanceTime
-            // For Check In (Status=1): use AttendanceTime to check if late
-            // For Check Out (Status=2): use AttendanceTime to check if left early
-            const wasLate = log.Status === 1 ? isTimeLate(log.AttendanceTime) : false;
-            const didLeaveEarly = log.Status === 2 ? isLeftEarly(log.AttendanceTime) : false;
+          // ✅ Convert to array and sort by date descending
+          const groupedArray = Array.from(groupedByDate.entries())
+            .map(([date, data]) => ({ date, ...data }))
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+          // ✅ Filter based on selected filter
+          const filteredDays = groupedArray.filter((day) => {
+            if (selectedFilter === 'total') return true;
+            
+            if (selectedFilter === 'ontime') {
+              return day.checkIn && !isTimeLate(day.checkIn.AttendanceTime);
+            }
+            
+            if (selectedFilter === 'late') {
+              return day.checkIn && isTimeLate(day.checkIn.AttendanceTime);
+            }
+            
+            if (selectedFilter === 'early') {
+              return day.checkOut && isLeftEarly(day.checkOut.AttendanceTime);
+            }
+            
+            return true;
+          });
+
+          if (filteredDays.length === 0) {
+            return (
+              <Text style={{ textAlign: "center", color: "#666", marginTop: 40 }}>
+                No {selectedFilter === 'total' ? '' : selectedFilter === 'ontime' ? 'on-time' : selectedFilter === 'late' ? 'late' : 'left early'} records found.
+              </Text>
+            );
+          }
+
+          return filteredDays.map((day) => {
+            const wasLate = day.checkIn ? isTimeLate(day.checkIn.AttendanceTime) : false;
+            const didLeaveEarly = day.checkOut ? isLeftEarly(day.checkOut.AttendanceTime) : false;
+            const hasCheckOut = !!day.checkOut;
 
             return (
-              <View key={`${log.AttendanceID}-${log.AttendanceDate}-${log.timeIn}`} style={styles.logCard}>
-                {/* Date and Status */}
-                <View
-                  style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
-                >
-                  <Text style={{ fontWeight: "600" }}>
-                    {formatDate(log.AttendanceDate)}
-                  </Text>
-                  <View style={{ flexDirection: "row", gap: 4 }}>
+              <View 
+                key={day.date} 
+                style={[
+                  styles.logCard,
+                  { borderLeftWidth: 3, borderLeftColor: "#00A652" }
+                ]}
+              >
+                {/* Header: Date & Badges */}
+                <View style={styles.logCardHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.compactDate}>
+                      {formatDate(day.date)}
+                    </Text>
+                    <Text style={styles.compactDayOfWeek}>
+                      {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })}
+                    </Text>
+                  </View>
+                  
+                  {/* Status Badges */}
+                  <View style={styles.compactBadgeContainer}>
                     {wasLate && (
                       <View style={styles.badgeLate}>
                         <Text style={styles.badgeText}>Late</Text>
@@ -788,58 +890,44 @@ export default function AttendanceScreen() {
                     )}
                     {didLeaveEarly && (
                       <View style={styles.badgeEarly}>
-                        <Text style={styles.badgeText}>Left Early</Text>
+                        <Text style={styles.badgeText}>Early</Text>
                       </View>
                     )}
-                    <Text
-                      style={{
-                        color: statusColor,
-                        fontWeight: "600",
-                        fontSize: 13,
-                      }}
-                    >
-                      {statusText}
-                    </Text>
                   </View>
                 </View>
 
-                {/* Time In and Time Out */}
-                {/* Show actual time based on Status */}
-                <View style={{ marginTop: 6 }}>
-                  {log.Status === 1 && (
-                    <View>
-                      <Text style={{ color: "#555", fontSize: 13 }}>
-                        Time In: {log.AttendanceTime}
-                      </Text>
-                      {wasLate && (
-                        <Text style={{ fontSize: 10, color: "#dc2626", marginTop: 2 }}>
-                          ⚠️ After 9:15 AM
-                        </Text>
-                      )}
+                {/* Time Row */}
+                <View style={styles.timeRowCombined}>
+                  {/* Check In */}
+                  {day.checkIn && (
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <View style={[styles.compactIconWrapper, { backgroundColor: '#00A65220' }]}>
+                        <UserCheck size={14} color="#00A652" />
+                      </View>
+                      <View>
+                        <Text style={styles.timeLabel}>IN</Text>
+                        <Text style={styles.compactTime}>{day.checkIn.AttendanceTime}</Text>
+                      </View>
                     </View>
                   )}
-                  {log.Status === 2 && (
-                    <View>
-                      <Text style={{ color: "#555", fontSize: 13 }}>
-                        Time Out: {log.AttendanceTime}
-                      </Text>
-                      {didLeaveEarly && (
-                        <Text style={{ fontSize: 10, color: "#f59e0b", marginTop: 2 }}>
-                          ⚠️ Before 4:55 PM
-                        </Text>
-                      )}
+
+                  {/* Check Out */}
+                  {day.checkOut && (
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <View style={[styles.compactIconWrapper, { backgroundColor: '#28a74520' }]}>
+                        <LogOut size={14} color="#28a745" />
+                      </View>
+                      <View>
+                        <Text style={styles.timeLabel}>OUT</Text>
+                        <Text style={styles.compactTime}>{day.checkOut.AttendanceTime}</Text>
+                      </View>
                     </View>
                   )}
                 </View>
-
-                {/* Machine Name */}
-                <Text style={{ fontSize: 11, color: "#999", marginTop: 4 }}>
-                  Source: {log.MachineName}
-                </Text>
               </View>
             );
-          })
-        )}
+          });
+        })()}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -877,7 +965,7 @@ const styles = StyleSheet.create({
 
   checkInButton: {
     flex: 1,
-    backgroundColor: "#3b82f6",
+    backgroundColor: "#00A652",
     borderRadius: 12,
     padding: 16,
     alignItems: "center",
@@ -891,12 +979,12 @@ const styles = StyleSheet.create({
   },
 
   checkInButtonActive: {
-    backgroundColor: "#10b981",
+    backgroundColor: "#28a745",
   },
 
   checkOutButton: {
     flex: 1,
-    backgroundColor: "#f59e0b",
+    backgroundColor: "#00A652",
     borderRadius: 12,
     padding: 16,
     alignItems: "center",
@@ -910,7 +998,7 @@ const styles = StyleSheet.create({
   },
 
   checkOutButtonActive: {
-    backgroundColor: "#10b981",
+    backgroundColor: "#28a745",
   },
 
   buttonDisabled: {
@@ -932,59 +1020,111 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
 
-  timeDisplay: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#fff",
-    padding: 10,
-    borderRadius: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-
-  timeText: {
-    color: "#666",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-
   statsContainer: {
     paddingHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   statsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 8,
+    gap: 4,
   },
   statCard: {
     backgroundColor: "#fff",
     flex: 1,
-    marginHorizontal: 4,
-    borderRadius: 10,
-    padding: 12,
+    marginHorizontal: 2,
+    borderRadius: 8,
+    padding: 6,
     alignItems: "center",
     shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
     elevation: 2,
+    borderWidth: 2,
+    borderColor: "transparent",
   },
-  statLabel: { color: "#666", marginTop: 4, fontSize: 11 },
-  statValue: { fontSize: 16, fontWeight: "600", marginTop: 2 },
+  statCardActive: {
+    borderColor: "#00A652",
+    backgroundColor: "#f0fdf4",
+  },
+  iconWrapper: {
+    padding: 5,
+    backgroundColor: "#f0fdf4",
+    borderRadius: 6,
+    marginBottom: 3,
+  },
+  statLabel: { color: "#666", marginTop: 2, fontSize: 9, textAlign: "center" },
+  statValue: { fontSize: 13, fontWeight: "700", marginTop: 1 },
 
   logCard: {
     backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 12,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
     shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
+  },
+
+  singleLineRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  compactIconWrapper: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  compactDate: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#1a1a1a",
+  },
+
+  compactDayOfWeek: {
+    fontSize: 10,
+    color: "#999",
+    fontWeight: "500",
+  },
+
+  compactTime: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#1a1a1a",
+  },
+
+  compactBadgeContainer: {
+    flexDirection: "row",
+    gap: 4,
+    alignItems: "center",
+  },
+
+  logCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+
+  timeRowCombined: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+  },
+
+  timeLabel: {
+    fontSize: 9,
+    color: "#999",
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
 
   errorContainer: {
@@ -994,30 +1134,27 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorText: {
-    color: "#ef4444",
+    color: "#dc3545",
     fontSize: 16,
     textAlign: "center",
   },
 
   badgeLate: {
-    backgroundColor: "#fee2e2",
-    paddingHorizontal: 6,
+    backgroundColor: "#fecaca",
+    paddingHorizontal: 5,
     paddingVertical: 2,
     borderRadius: 4,
-    borderWidth: 1,
-    borderColor: "#dc2626",
   },
   badgeEarly: {
     backgroundColor: "#fef3c7",
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical: 2,
     borderRadius: 4,
-    borderWidth: 1,
-    borderColor: "#f59e0b",
   },
   badgeText: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: "#000",
+    fontSize: 8,
+    fontWeight: "700",
+    color: "#1a1a1a",
   },
 });
+

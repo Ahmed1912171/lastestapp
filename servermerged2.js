@@ -1274,11 +1274,13 @@ app.post(
     const branch = req.body.branch || req.query.branch || "korangi";
     const db = await getDb(branch);
 
-    const { pinNumber } = req.body;
+    const { pinNumber, deviceName, imei } = req.body;
 
     if (!pinNumber) {
       return res.status(400).json({ error: "PinNumber is required" });
     }
+    
+    console.log("📱 Device Info Received:", { deviceName, imei });
 
     const now = new Date();
     const dateStr = now.toISOString().split("T")[0]; // 2025-11-11
@@ -1352,10 +1354,12 @@ app.post(
         timeOut,
         Status,
         MachineName,
+        DeviceName,
+        IMEI,
         MachineID,
         \`Read\`,
         sync_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         maxId,               // Explicit AttendanceID
         pinNumberInt,        // 429 (integer, not "0429")
@@ -1366,6 +1370,8 @@ app.post(
         timeOutShort,        // "15:55"
         1,                   // Status: 1 = Check In
         "mobile app",        // MachineName
+        deviceName || "Unknown Device", // DeviceName
+        imei || null,        // IMEI (Unique Device ID)
         1,                   // MachineID (always 1 for mobile app)
         0,                   // Read
         0,                   // sync_status
@@ -1403,9 +1409,9 @@ app.post(
     const branch = req.body.branch || req.query.branch || "korangi";
     const db = await getDb(branch);
 
-    const { pinNumber } = req.body;
+    const { pinNumber, deviceName, imei } = req.body;
 
-    console.log("🔄 Time Out Request:", { pinNumber, branch });
+    console.log("🔄 Time Out Request:", { pinNumber, branch, deviceName, imei });
 
     if (!pinNumber) {
       return res.status(400).json({ error: "PinNumber is required" });
@@ -1499,10 +1505,12 @@ app.post(
         timeOut,
         Status,
         MachineName,
+        DeviceName,
+        IMEI,
         MachineID,
         \`Read\`,
         sync_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         maxId,
         pinNumberInt,
@@ -1513,6 +1521,8 @@ app.post(
         timeOutShort,      // "15:55"
         2,                 // Status: 2 = Check Out
         "mobile app",
+        deviceName || "Unknown Device", // DeviceName
+        imei || null,      // IMEI (Unique Device ID)
         1,
         0,
         0,
@@ -1556,8 +1566,7 @@ app.get(
     const [records] = await db.query(
       `SELECT 
         AttendanceDate,
-        timeIn,
-        timeOut,
+        AttendanceTime,
         Status
       FROM as_attendance
       WHERE PinNumber = ?
@@ -1565,16 +1574,54 @@ app.get(
       [pinNumberInt]
     );
 
+    console.log(`\n🔍 Found ${records.length} attendance records for PinNumber ${pinNumberInt}`);
+    console.log("Sample records:", records.slice(0, 5).map(r => ({
+      date: r.AttendanceDate,
+      time: r.AttendanceTime,
+      status: r.Status
+    })));
+
+    // ✅ Helper function to parse "HH:MM AM/PM" format to 24-hour minutes
+    const parseAttendanceTime = (timeStr) => {
+      if (!timeStr) {
+        console.log("⚠️ parseAttendanceTime: Empty timeStr");
+        return null;
+      }
+      try {
+        const [time, period] = timeStr.split(" ");
+        const [hoursStr, minutesStr] = time.split(":");
+        let hours = parseInt(hoursStr);
+        const minutes = parseInt(minutesStr);
+        
+        // Convert to 24-hour format
+        if (period === "PM" && hours !== 12) {
+          hours += 12;
+        } else if (period === "AM" && hours === 12) {
+          hours = 0;
+        }
+        
+        const totalMinutes = hours * 60 + minutes;
+        console.log(`🕐 Parsed "${timeStr}" → ${hours}:${minutes} (${totalMinutes} minutes)`);
+        return totalMinutes;
+      } catch (err) {
+        console.log(`❌ Parse error for "${timeStr}":`, err.message);
+        return null;
+      }
+    };
+
     // ✅ Group records by date (since we have 2 records per day now: Status=1 and Status=2)
     const dateMap = new Map();
     
     records.forEach((record) => {
-      const date = record.AttendanceDate;
-      if (!dateMap.has(date)) {
-        dateMap.set(date, { checkIn: null, checkOut: null });
+      // ✅ Convert Date object to string format (YYYY-MM-DD) for proper Map grouping
+      const dateObj = new Date(record.AttendanceDate);
+      const dateStr = dateObj.toISOString().split('T')[0]; // "2025-11-13"
+      
+      if (!dateMap.has(dateStr)) {
+        dateMap.set(dateStr, { checkIn: null, checkOut: null });
       }
       
-      const dayData = dateMap.get(date);
+      const dayData = dateMap.get(dateStr);
       if (record.Status === 1) {
         dayData.checkIn = record;
       } else if (record.Status === 2) {
@@ -1589,34 +1636,51 @@ app.get(
     let fullDays = 0;
 
     // ✅ Calculate stats: Only count days with at least a check-in
+    console.log(`\n📊 Processing ${dateMap.size} unique dates...`);
+    
     dateMap.forEach((dayData, date) => {
+      console.log(`\n📅 Date: ${date}`);
+      console.log(`   Check In: ${dayData.checkIn ? `Status=${dayData.checkIn.Status}, Time="${dayData.checkIn.AttendanceTime}"` : "None"}`);
+      console.log(`   Check Out: ${dayData.checkOut ? `Status=${dayData.checkOut.Status}, Time="${dayData.checkOut.AttendanceTime}"` : "None"}`);
+      
       if (dayData.checkIn) {
         totalDays++;
 
-        // Check if late (after 9:15 AM)
-        if (dayData.checkIn.timeIn) {
-          const [hours, minutes] = dayData.checkIn.timeIn.split(":").map(Number);
-          const totalMinutes = hours * 60 + minutes;
-          const cutoffMinutes = 9 * 60 + 15; // 9:15 AM
+        // Check if late (after 9:15 AM) using AttendanceTime
+        const checkInMinutes = parseAttendanceTime(dayData.checkIn.AttendanceTime);
+        if (checkInMinutes !== null) {
+          const cutoffMinutes = 9 * 60 + 15; // 9:15 AM = 555 minutes
           
-          if (totalMinutes > cutoffMinutes) {
+          if (checkInMinutes > cutoffMinutes) {
+            console.log(`   ❌ LATE: ${checkInMinutes} > ${cutoffMinutes}`);
             lateDays++;
           } else {
+            console.log(`   ✅ ON TIME: ${checkInMinutes} <= ${cutoffMinutes}`);
             onTimeDays++;
           }
         }
 
         // Check if left early (before 4:55 PM) - only if checked out
-        if (dayData.checkOut && dayData.checkOut.timeOut) {
-          const [hours, minutes] = dayData.checkOut.timeOut.split(":").map(Number);
-          const totalMinutes = hours * 60 + minutes;
-          const endTimeMinutes = 16 * 60 + 55; // 4:55 PM
+        if (dayData.checkOut) {
+          console.log(`   🔍 Checkout AttendanceTime raw value: "${dayData.checkOut.AttendanceTime}"`);
+          const checkOutMinutes = parseAttendanceTime(dayData.checkOut.AttendanceTime);
+          console.log(`   🔍 Parsed checkOutMinutes: ${checkOutMinutes}`);
           
-          if (totalMinutes < endTimeMinutes) {
-            leftEarlyDays++;
+          if (checkOutMinutes !== null) {
+            const endTimeMinutes = 16 * 60 + 55; // 4:55 PM = 1015 minutes
+            
+            if (checkOutMinutes < endTimeMinutes) {
+              console.log(`   ⚠️ LEFT EARLY: ${checkOutMinutes} < ${endTimeMinutes}`);
+              leftEarlyDays++;
+            } else {
+              console.log(`   ✅ FULL DAY: ${checkOutMinutes} >= ${endTimeMinutes}`);
+              fullDays++;
+            }
           } else {
-            fullDays++;
+            console.log(`   ❌ ERROR: checkOutMinutes is NULL! Cannot compare.`);
           }
+        } else {
+          console.log(`   ⏳ No checkout record for this day`);
         }
       }
     });

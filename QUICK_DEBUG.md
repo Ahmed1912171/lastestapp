@@ -37,7 +37,7 @@ pinNumber: ?
 
 **Test backend:**
 ```
-Open browser: http://192.168.100.93:3000/
+Open browser: http://192.168.100.117:3000/
 Should show: {"status":"✅ Server running","time":"..."}
 ```
 
@@ -58,13 +58,13 @@ Can Click Check Out: true  ← Should be true!
 **Check:** Is pinNumber showing in debug panel?
 
 ### Issue D: Server not responding
-**Check:** IP address correct? (192.168.100.93:3000)
+**Check:** IP address correct? (192.168.100.117:3000)
 
 ---
 
 ## Quick Test:
 
-1. Open browser: `http://192.168.100.93:3000/admin`
+1. Open browser: `http://192.168.100.117:3000/admin`
 2. Do you see data?
 3. If NO → Server or network issue
 4. If YES → Check frontend logs
