@@ -2,31 +2,32 @@
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import {
-    Activity,
-    Bed,
-    BedSingle,
-    Hospital,
-    TestTubes,
-    TrendingUp,
-    Users,
-    Warehouse,
+  Activity,
+  Bed,
+  BedSingle,
+  Hospital,
+  TestTubes,
+  TrendingUp,
+  Users,
+  Warehouse,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    RefreshControl,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AIChatModal from "../../components/AIChatModal";
 import SimpleAvatar from "../../components/SimpleAvatar";
 import SimpleChart from "../../components/SimpleChart";
+import { useSession } from "../../ctx";
 
 type WardData = {
   ward_id: number;
@@ -50,6 +51,7 @@ type BranchWards = Record<
 type BranchData = Record<string, BranchWards>;
 
 export default function Dashboard() {
+  const { session } = useSession();
   const [branchOpen, setBranchOpen] = useState(false);
   const [wardOpen, setWardOpen] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState<string>("");
@@ -240,6 +242,20 @@ export default function Dashboard() {
     setSelectedWard(v);
   };
 
+  const userAny = session?.user as any;
+  const hasNameFields =
+    !!userAny && ("ADMIN_FIRST_NAME" in userAny || "ADMIN_LAST_NAME" in userAny);
+  const adminFirstName = hasNameFields
+    ? (userAny?.ADMIN_FIRST_NAME as string | null | undefined)
+    : undefined;
+  const adminLastName = hasNameFields
+    ? (userAny?.ADMIN_LAST_NAME as string | null | undefined)
+    : undefined;
+  const grEmployer = session?.user?.GR_EMPLOYER_LOGIN?.split("-")[0] || "User";
+  const greetingName = hasNameFields
+    ? `${adminFirstName ?? "null"} ${adminLastName ?? "null"}`.trim()
+    : grEmployer;
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
@@ -252,7 +268,7 @@ export default function Dashboard() {
       >
         <View style={styles.header}>
           <View>
-            <Text style={styles.hello}>Hello, Dr. Ahmed Hasan</Text>
+            <Text style={styles.hello}>Hello, {greetingName}!</Text>
             <Text style={styles.date}>{today}</Text>
           </View>
           <SimpleAvatar fallback="AH" size={48} />

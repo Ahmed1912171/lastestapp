@@ -11,15 +11,31 @@ import SimpleAvatar from "../../components/SimpleAvatar";
 import { useSession } from "../../ctx";
 import { useTheme } from "../../ctx/theme"; // ✅ global theme hook
 
-const doctor = {
-  name: "Dr. Ahmed Hasan",
-  id: "Sichn12345",
-  email: "ahmed@sichn.com",
-};
-
 export default function Profile() {
-  const { isDarkMode, toggleDarkMode } = useTheme();
-  const { signOut } = useSession();
+  const { isDarkMode } = useTheme();
+  const { session, signOut } = useSession();
+
+  const userAny = session?.user as any;
+  const hasNameFields =
+    !!userAny && ("ADMIN_FIRST_NAME" in userAny || "ADMIN_LAST_NAME" in userAny);
+
+  const adminFirstName = hasNameFields
+    ? (userAny?.ADMIN_FIRST_NAME as string | null | undefined)
+    : undefined;
+  const adminLastName = hasNameFields
+    ? (userAny?.ADMIN_LAST_NAME as string | null | undefined)
+    : undefined;
+  const grEmployer = session?.user?.GR_EMPLOYER_LOGIN?.split("-")[0] || "User";
+
+  const displayName = hasNameFields
+    ? ` ${adminFirstName ?? "null"} ${adminLastName ?? "null"}`.trim()
+    : ` ${grEmployer}`;
+
+  const staffId = session?.user?.pinNumber
+    ? `PIN: ${session.user.pinNumber}`
+    : session?.user?.ADMIN_ID
+    ? `ID: ${session.user.ADMIN_ID}`
+    : "ID: ----";
 
   return (
     <SafeAreaView
@@ -32,14 +48,17 @@ export default function Profile() {
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           <SimpleAvatar
-            fallback={doctor.name
+            fallback={displayName
+              .replace("Dr. ", "")
               .split(" ")
+              .filter(Boolean)
               .map((n) => n[0])
-              .join("")}
+              .join("")
+              .slice(0, 2)}
             size={90}
           />
           <Text style={[styles.name, { color: isDarkMode ? "#fff" : "#111" }]}>
-            {doctor.name}
+            {displayName}
           </Text>
         </View>
 
@@ -53,7 +72,7 @@ export default function Profile() {
                 { color: isDarkMode ? "#fff" : "#111" },
               ]}
             >
-              {doctor.id}
+              {staffId}
             </Text>
           </View>
 
@@ -65,7 +84,7 @@ export default function Profile() {
                 { color: isDarkMode ? "#fff" : "#111" },
               ]}
             >
-              {doctor.email}
+              {session?.user?.GR_EMPLOYER_LOGIN || "N/A"}
             </Text>
           </View>
         </View>

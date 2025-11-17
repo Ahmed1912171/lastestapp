@@ -1,31 +1,31 @@
 // app/(app)/leaves.tsx
 import axios from "axios";
 import {
-    ArrowLeft,
-    Calendar as CalendarIcon,
-    CheckCircle,
-    Clock,
-    FileText,
-    Plus,
-    XCircle
+  ArrowLeft,
+  Calendar as CalendarIcon,
+  CheckCircle,
+  Clock,
+  FileText,
+  Plus,
+  XCircle
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Keyboard,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSession } from "../ctx";

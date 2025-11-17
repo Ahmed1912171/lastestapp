@@ -150,22 +150,40 @@ app.post(
     // ✅ But remember which branch user wants to work at
     const selectedBranch = req.body.branch || req.query.branch || "korangi";
 
-    const { username, password } = req.body;
+    const rawUsername = req.body.username || "";
+    const password = req.body.password || "";
+    const username = rawUsername.trim();
     
     console.log("🔐 Login Attempt:", {
       username,
-      password: password ? `${password.substring(0, 3)}***` : "empty",
+      passwordProvided: password ? `${password.substring(0, 1)}***` : "empty",
       loginDatabase: "korangi (central)",
-      selectedBranch: selectedBranch
+      selectedBranch
     });
     
     if (!username || !password)
       return res.status(400).json({ error: "Missing credentials" });
 
-    // ✅ Query Korangi database (central admin table)
+    // ✅ Password is fixed to "Sichn" for all users
+    if (password !== "Sichn") {
+      console.log("❌ Login Failed: Incorrect master password");
+      return res.status(401).json({ success: false, error: "Invalid credentials" });
+    }
+
+    // ✅ Query Korangi database (central admin table) using GR_EMPLOYER_LOGIN as username
     const [results] = await loginDb.query(
-      "SELECT ADMIN_ID, GR_EMPLOYER_LOGIN FROM admin WHERE ADMIN_ID = ? AND GR_EMPLOYER_LOGIN = ? LIMIT 1",
-      [username, password]
+      `SELECT 
+         a.ADMIN_ID, 
+         a.GR_EMPLOYER_LOGIN,
+         a.ADMIN_FIRST_NAME,
+         a.ADMIN_LAST_NAME,
+         epi.manager_status
+       FROM admin a 
+       LEFT JOIN eis_personal_information epi 
+         ON epi.EIS_EMPLOYEE_CODE = a.GR_EMPLOYER_LOGIN
+       WHERE a.GR_EMPLOYER_LOGIN = ? 
+       LIMIT 1`,
+      [username]
     );
 
     if (results.length > 0) {
@@ -177,7 +195,10 @@ app.post(
       console.log("✅ Login Success! User found in Korangi DB:", {
         ADMIN_ID: user.ADMIN_ID,
         GR_EMPLOYER_LOGIN: user.GR_EMPLOYER_LOGIN,
-        selectedBranch: selectedBranch,
+        selectedBranch,
+        ADMIN_FIRST_NAME: user.ADMIN_FIRST_NAME || null,
+        ADMIN_LAST_NAME: user.ADMIN_LAST_NAME || null,
+        manager_status: typeof user.manager_status === "number" ? user.manager_status : null,
         hasDash: user.GR_EMPLOYER_LOGIN ? user.GR_EMPLOYER_LOGIN.includes("-") : false
       });
       
@@ -195,7 +216,8 @@ app.post(
         user: {
           ...user,
           pinNumber,  // ✅ Add PinNumber to response
-          branch: selectedBranch  // ✅ Include selected branch
+          branch: selectedBranch,  // ✅ Include selected branch
+          manager_status: typeof user.manager_status === "number" ? user.manager_status : null
         }
       });
     } else {

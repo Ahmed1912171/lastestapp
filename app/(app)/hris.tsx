@@ -1,6 +1,7 @@
-import { Calendar, FileText } from "lucide-react-native";
+import { Calendar, ClipboardCheck, FileText } from "lucide-react-native";
 import React, { useState } from "react";
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,14 +11,24 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import AttendanceScreen from "../../components/attendance";
 import LeavesScreen from "../../components/leaves";
+import LeavesApproval from "../../components/LeavesApproval";
 import SimpleAvatar from "../../components/SimpleAvatar";
 import { useSession } from "../../ctx";
 
 export default function HRISScreen() {
   const { session } = useSession();
-  const [activeView, setActiveView] = useState<'menu' | 'attendance' | 'leaves'>('menu');
+  const [activeView, setActiveView] = useState<'menu' | 'attendance' | 'leaves' | 'approval'>('menu');
 
   const userName = session?.user?.GR_EMPLOYER_LOGIN?.split("-")[0] || "User";
+  const pinNumber = session?.user?.pinNumber || (
+    session?.user?.GR_EMPLOYER_LOGIN?.includes("-")
+      ? session.user.GR_EMPLOYER_LOGIN.split("-")[1]
+      : session?.user?.ADMIN_ID
+  ) || "----";
+  const isManager =
+    typeof (session?.user as any)?.manager_status === "number"
+      ? (session?.user as any)?.manager_status === 1
+      : true;
 
   if (activeView === 'attendance') {
     return <AttendanceScreen onBack={() => setActiveView('menu')} />;
@@ -27,13 +38,17 @@ export default function HRISScreen() {
     return <LeavesScreen onBack={() => setActiveView('menu')} />;
   }
 
+  if (activeView === 'approval') {
+    return <LeavesApproval onBack={() => setActiveView('menu')} />;
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* Header */}
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>HRIS</Text>
-          <Text style={styles.subtitle}>Hello, {userName}</Text>
+          <Text style={styles.pinText}>PIN: {pinNumber}</Text>
         </View>
         <SimpleAvatar
           fallback={userName.substring(0, 2).toUpperCase()}
@@ -49,7 +64,7 @@ export default function HRISScreen() {
       >
         {/* Buttons Grid */}
         <View style={styles.buttonsGrid}>
-          {/* Attendance Button */}
+          {/* Attendance Button - Full Width */}
           <TouchableOpacity
             style={styles.buttonCard}
             onPress={() => setActiveView('attendance')}
@@ -64,20 +79,49 @@ export default function HRISScreen() {
             </Text>
           </TouchableOpacity>
 
-          {/* Leaves Button */}
+          {/* Leaves Buttons Row - Side by Side */}
+          <View style={styles.leavesRow}>
+            {/* Leave Requests Button */}
+            <TouchableOpacity
+              style={[styles.buttonCard, styles.halfWidthCard]}
+              onPress={() => setActiveView('leaves')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.iconWrapper, { backgroundColor: "#dbeafe" }]}>
+                <FileText size={32} color="#3b82f6" />
+              </View>
+              <Text style={styles.buttonTitle}>Leave Requests</Text>
+              <Text style={styles.buttonSubtitle}>
+                Request and manage your leaves
+              </Text>
+            </TouchableOpacity>
+
+          {/* Leaves Approval Button */}
           <TouchableOpacity
-            style={styles.buttonCard}
-            onPress={() => setActiveView('leaves')}
+            style={[
+              styles.buttonCard,
+              styles.halfWidthCard,
+              !isManager && { opacity: 0.5 },
+            ]}
+            onPress={() => {
+              if (!isManager) {
+                Alert.alert("Restricted Access", "Only managers can review leave approvals.");
+                return;
+              }
+              setActiveView('approval');
+            }}
             activeOpacity={0.7}
           >
-            <View style={[styles.iconWrapper, { backgroundColor: "#dbeafe" }]}>
-              <FileText size={32} color="#3b82f6" />
-            </View>
-            <Text style={styles.buttonTitle}>Leave Requests</Text>
-            <Text style={styles.buttonSubtitle}>
-              Request and manage your leaves
-            </Text>
-          </TouchableOpacity>
+              <View style={[styles.iconWrapper, { backgroundColor: "#fee2e2" }]}>
+                <ClipboardCheck size={32} color="#ef4444" />
+              </View>
+              <Text style={styles.buttonTitle}>Leaves Approval</Text>
+              <Text style={styles.buttonSubtitle}>
+              Review and approve pending requests
+              {!isManager ? " (Restricted)" : ""}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -114,7 +158,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 2,
   },
+  pinText: {
+    color: "#999",
+    fontSize: 12,
+    marginTop: 4,
+  },
   buttonsGrid: {
+    gap: 16,
+  },
+  leavesRow: {
+    flexDirection: "row",
     gap: 16,
   },
   buttonCard: {
@@ -129,6 +182,9 @@ const styles = StyleSheet.create({
     elevation: 3,
     borderWidth: 1,
     borderColor: "#e5e7eb",
+  },
+  halfWidthCard: {
+    flex: 1,
   },
   iconWrapper: {
     width: 64,

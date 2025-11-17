@@ -6,6 +6,9 @@ type UserData = {
   GR_EMPLOYER_LOGIN: string;
   pinNumber: string | null;
   branch?: string;
+  ADMIN_FIRST_NAME?: string | null;
+  ADMIN_LAST_NAME?: string | null;
+  manager_status?: number | null;
 };
 
 type Session = { user: UserData } | null;

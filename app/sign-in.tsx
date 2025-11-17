@@ -21,8 +21,8 @@ export default function LoginScreen() {
   const { signIn } = useSession();
   const router = useRouter();
 
-  const [username, setUsername] = useState("1462");
-  const [password, setPassword] = useState("130481-0429"); // ✅ Empty - user must enter correct password
+  const [username, setUsername] = useState("140822-52374");
+  const [password, setPassword] = useState("Sichn"); // ✅ Master password required for all users
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -78,6 +78,14 @@ export default function LoginScreen() {
           GR_EMPLOYER_LOGIN: userData.GR_EMPLOYER_LOGIN,
           pinNumber: userData.pinNumber,
           branch: "korangi",
+          ADMIN_FIRST_NAME: userData.ADMIN_FIRST_NAME || null,
+          ADMIN_LAST_NAME: userData.ADMIN_LAST_NAME || null,
+          manager_status:
+            typeof userData.manager_status === "number"
+              ? userData.manager_status
+              : userData.manager_status === null
+              ? null
+              : undefined,
         });
         
         router.replace("/");
@@ -122,12 +130,11 @@ export default function LoginScreen() {
 
           {/* Username */}
           <TextInput
-            placeholder="Username (ID)"
+            placeholder="Username (GR Employer Login)"
             placeholderTextColor="#999"
             value={username}
             onChangeText={setUsername}
             autoCapitalize="none"
-            keyboardType="numeric"
             style={styles.input}
           />
 
