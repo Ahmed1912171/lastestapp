@@ -12,9 +12,9 @@ import { useSession } from "../../ctx";
 import { useTheme } from "../../ctx/theme"; // ✅ global theme hook
 
 const doctor = {
-  name: "Dr. Ahmed",
-  id: "DOC12345",
-  email: "ahmed@example.com",
+  name: "Dr. Ahmed Hasan",
+  id: "Sichn12345",
+  email: "ahmed@sichn.com",
 };
 
 export default function Profile() {

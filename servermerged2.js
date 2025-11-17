@@ -1551,6 +1551,256 @@ app.post(
   })
 );
 
+// ==========================
+// 🍃 LEAVE MANAGEMENT ENDPOINTS
+// ==========================
+
+// ✅ Get all leave types from database
+app.get(
+  "/leave-types",
+  safeHandler(async (req, res) => {
+    const branch = req.query.branch || "korangi";
+    const db = await getDb(branch);
+
+    const [results] = await db.query(
+      `SELECT 
+        leave_type_id as id,
+        name,
+        applicable_to as applicableTo,
+        monthly_quota as monthlyQuota
+      FROM leave_types_fth
+      ORDER BY leave_type_id`
+    );
+
+    res.json(results);
+  })
+);
+
+// ✅ Get employee leave balances
+app.get(
+  "/leave-balance/:pinNumber",
+  safeHandler(async (req, res) => {
+    const branch = req.query.branch || "korangi";
+    const db = await getDb(branch);
+    const { pinNumber } = req.params;
+
+    const pinNumberInt = parseInt(pinNumber, 10);
+
+    try {
+      console.log("📥 Fetching leave balance for employee_id:", pinNumberInt);
+      
+      // Get current balances grouped by leave type
+      const [balances] = await db.query(
+        `SELECT 
+          la.leave_type_id as leaveTypeId,
+          lt.name as leaveTypeName,
+          SUM(la.accrued_amount) as totalAccrued,
+          lt.monthly_quota as monthlyQuota,
+          lt.applicable_to as applicableTo
+        FROM leave_accruals_fth la
+        LEFT JOIN leave_types_fth lt ON la.leave_type_id = lt.leave_type_id
+        WHERE la.employee_id = ?
+        GROUP BY la.leave_type_id, lt.name, lt.monthly_quota, lt.applicable_to`,
+        [pinNumberInt]
+      );
+
+      console.log("✅ Leave balance results:", balances.length, "records found");
+      res.json(balances);
+    } catch (err) {
+      // Employee might not have accruals yet or table doesn't exist - return empty array
+      console.log("⚠️ Error fetching leave balance for employee", pinNumberInt, ":", err.message);
+      res.json([]);
+    }
+  })
+);
+
+// ✅ Get all leave requests for a user
+app.get(
+  "/leaves/:pinNumber",
+  safeHandler(async (req, res) => {
+    const branch = req.query.branch || "korangi";
+    const db = await getDb(branch);
+    const { pinNumber } = req.params;
+
+    const pinNumberInt = parseInt(pinNumber, 10);
+
+    try {
+      console.log("📥 Fetching leave requests for employee_id:", pinNumberInt);
+      
+      const [results] = await db.query(
+        `SELECT 
+          lr.leave_id as id,
+          lr.employee_id as pinNumber,
+          lr.leave_type_id as leaveTypeId,
+          lt.name as leaveType,
+          DATE_FORMAT(lr.start_date, '%Y-%m-%d') as startDate,
+          DATE_FORMAT(lr.end_date, '%Y-%m-%d') as endDate,
+          lr.reason,
+          lr.status,
+          lr.total_days as daysRequested,
+          lr.total_days_deduction as daysDeduction,
+          lr.approved_by as approvedBy,
+          lr.current_stage as currentStage,
+          DATE_FORMAT(lr.start_date, '%Y-%m-%d') as requestDate
+        FROM leave_requests_fth lr
+        LEFT JOIN leave_types_fth lt ON lr.leave_type_id = lt.leave_type_id
+        WHERE lr.employee_id = ?
+        ORDER BY lr.leave_id DESC`,
+        [pinNumberInt]
+      );
+
+      console.log("✅ Leave requests results:", results.length, "records found");
+      res.json(results);
+    } catch (err) {
+      // Table might not exist yet - return empty array
+      console.log("⚠️ Error fetching leave requests:", err.message);
+      res.json([]);
+    }
+  })
+);
+
+// ✅ Submit new leave request
+app.post(
+  "/leaves/request",
+  safeHandler(async (req, res) => {
+    const branch = req.body.branch || req.query.branch || "korangi";
+    const db = await getDb(branch);
+
+    const { pinNumber, leaveTypeId, startDate, endDate, reason } = req.body;
+
+    if (!pinNumber || !leaveTypeId || !startDate || !endDate || !reason) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const pinNumberInt = parseInt(pinNumber, 10);
+
+    // ✅ Calculate days requested
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+    console.log("📝 Inserting leave request:", {
+      employee_id: pinNumberInt,
+      leave_type_id: leaveTypeId,
+      start_date: startDate,
+      end_date: endDate,
+      total_days: totalDays,
+      reason: reason
+    });
+
+    // ✅ Insert into existing leave_requests_fth table
+    const [result] = await db.query(
+      `INSERT INTO leave_requests_fth 
+        (employee_id, leave_type_id, start_date, end_date, total_days, total_days_deduction, status, reason, current_stage)
+      VALUES (?, ?, ?, ?, ?, ?, 'Pending', ?, NULL)`,
+      [pinNumberInt, leaveTypeId, startDate, endDate, totalDays, totalDays, reason]
+    );
+
+    console.log("✅ Leave request inserted with ID:", result.insertId);
+
+    res.json({
+      success: true,
+      message: "Leave request submitted successfully",
+      leaveId: result.insertId,
+      daysRequested: totalDays,
+    });
+  })
+);
+
+// ✅ Approve leave request (Admin only)
+app.put(
+  "/leaves/:id/approve",
+  safeHandler(async (req, res) => {
+    const branch = req.body.branch || req.query.branch || "korangi";
+    const db = await getDb(branch);
+    const { id } = req.params;
+    const { approvedBy } = req.body;
+
+    if (!approvedBy) {
+      return res.status(400).json({ error: "approvedBy is required" });
+    }
+
+    const [result] = await db.query(
+      `UPDATE leave_requests_fth 
+       SET status = 'Approved', approved_by = ?
+       WHERE leave_id = ?`,
+      [approvedBy, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Leave request not found" });
+    }
+
+    res.json({
+      success: true,
+      message: "Leave request approved",
+    });
+  })
+);
+
+// ✅ Reject leave request (Admin only)
+app.put(
+  "/leaves/:id/reject",
+  safeHandler(async (req, res) => {
+    const branch = req.body.branch || req.query.branch || "korangi";
+    const db = await getDb(branch);
+    const { id } = req.params;
+    const { rejectionReason, rejectedBy } = req.body;
+
+    if (!rejectionReason) {
+      return res.status(400).json({ error: "rejectionReason is required" });
+    }
+
+    const [result] = await db.query(
+      `UPDATE leave_requests_fth 
+       SET status = 'Rejected', reason = ?, approved_by = ?
+       WHERE leave_id = ?`,
+      [rejectionReason, rejectedBy || "Admin", id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Leave request not found" });
+    }
+
+    res.json({
+      success: true,
+      message: "Leave request rejected",
+    });
+  })
+);
+
+// ✅ Get all pending leave requests (for Admin dashboard)
+app.get(
+  "/leaves/pending/all",
+  safeHandler(async (req, res) => {
+    const branch = req.query.branch || "korangi";
+    const db = await getDb(branch);
+
+    const [results] = await db.query(
+      `SELECT 
+        lr.leave_id as id,
+        lr.employee_id as pinNumber,
+        lr.leave_type_id as leaveTypeId,
+        lt.name as leaveType,
+        DATE_FORMAT(lr.start_date, '%Y-%m-%d') as startDate,
+        DATE_FORMAT(lr.end_date, '%Y-%m-%d') as endDate,
+        lr.total_days as daysRequested,
+        lr.reason,
+        lr.status,
+        DATE_FORMAT(lr.start_date, '%Y-%m-%d') as requestDate,
+        a.GR_EMPLOYER_LOGIN as employeeName
+      FROM leave_requests_fth lr
+      LEFT JOIN leave_types_fth lt ON lr.leave_type_id = lt.leave_type_id
+      LEFT JOIN admin a ON lr.employee_id = CAST(SUBSTRING_INDEX(a.GR_EMPLOYER_LOGIN, '-', -1) AS UNSIGNED)
+      WHERE lr.status = 'Pending'
+      ORDER BY lr.leave_id DESC`
+    );
+
+    res.json(results);
+  })
+);
+
 // ✅ Get attendance statistics
 app.get(
   "/attendance/:pinNumber/stats",

@@ -77,20 +77,22 @@ export default function AppLayout() {
           }}
         />
 
-        {/* 📅 Attendance */}
+        {/* 👤 Profile */}
         <Tabs.Screen
-          name="attendance"
+          name="hris"
           options={{
-            title: "Attendance",
+            title: "Profile",
             tabBarIcon: ({ color, focused }) => (
               <Ionicons
-                name={focused ? "calendar" : "calendar-outline"}
+              name={focused ? "document-text" : "document-text-outline"}
                 size={26}
                 color={color}
               />
             ),
           }}
         />
+
+        
 
         {/* 🔍 Search */}
         <Tabs.Screen
@@ -121,6 +123,7 @@ export default function AppLayout() {
             ),
           }}
         />
+       
       </Tabs>
     </GestureHandlerRootView>
   );

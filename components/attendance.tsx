@@ -4,6 +4,7 @@ import axios from "axios";
 import * as Device from "expo-device";
 import * as Location from "expo-location";
 import {
+  ArrowLeft,
   Calendar,
   CalendarX,
   Clock,
@@ -18,14 +19,15 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import SimpleAvatar from "../../components/SimpleAvatar";
-import { useSession } from "../../ctx";
+import { useSession } from "../ctx";
+import SimpleAvatar from "./SimpleAvatar";
 
 // ✅ Attendance log type matching database structure
 type AttendanceLog = {
@@ -166,7 +168,11 @@ type Stats = {
   fullDays: number;
 };
 
-export default function AttendanceScreen() {
+type AttendanceScreenProps = {
+  onBack?: () => void;
+};
+
+export default function AttendanceScreen({ onBack }: AttendanceScreenProps) {
   const { session } = useSession();
   const [attendanceLogs, setAttendanceLogs] = useState<AttendanceLog[]>([]);
   const [stats, setStats] = useState<Stats>({
@@ -190,7 +196,7 @@ export default function AttendanceScreen() {
   const [selectedFilter, setSelectedFilter] = useState<'total' | 'ontime' | 'late' | 'early'>('total');
 
   // ✅ API Configuration
-  const LOCAL_IP = "192.168.100.117";
+  const LOCAL_IP = "192.168.100.132";
   const API_BASE =
     Platform.OS === "android"
       ? "http://10.0.2.2:3000"
@@ -632,19 +638,30 @@ export default function AttendanceScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>Attendance</Text>
-          <Text style={styles.subtitle}>Hello, {userName}</Text>
-          <Text style={styles.pinText}>PIN: {pinNumber}</Text>
+      <StatusBar barStyle="dark-content" />
+      {/* Header with conditional back button - matches LeavesScreen */}
+      {onBack ? (
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onBack} style={styles.backButton}>
+            <ArrowLeft size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Attendance</Text>
+          <View style={{ width: 40 }} />
         </View>
+      ) : (
+        <View style={styles.header}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>Attendance</Text>
+            <Text style={styles.subtitle}>Hello, {userName}</Text>
+            <Text style={styles.pinText}>PIN: {pinNumber}</Text>
+          </View>
 
-        <SimpleAvatar
-          fallback={userName.substring(0, 2).toUpperCase()}
-          size={48}
-        />
-      </View>
+          <SimpleAvatar
+            fallback={userName.substring(0, 2).toUpperCase()}
+            size={48}
+          />
+        </View>
+      )}
 
       {/* Attendance Logs - Pull to Refresh Wrapper */}
       <ScrollView
@@ -952,6 +969,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#ddd",
   },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#1a1a1a",
+  },
   title: { fontSize: 20, fontWeight: "600" },
   subtitle: { color: "#666", fontSize: 14 },
   pinText: { color: "#999", fontSize: 12, marginTop: 2 },
@@ -979,7 +1004,7 @@ const styles = StyleSheet.create({
   },
 
   checkInButtonActive: {
-    backgroundColor: "#28a745",
+    backgroundColor: "#9ca3af",
   },
 
   checkOutButton: {
@@ -998,7 +1023,7 @@ const styles = StyleSheet.create({
   },
 
   checkOutButtonActive: {
-    backgroundColor: "#28a745",
+    backgroundColor: "#9ca3af",
   },
 
   buttonDisabled: {
