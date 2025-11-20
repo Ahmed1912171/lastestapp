@@ -1,31 +1,31 @@
 // app/(app)/leaves.tsx
 import axios from "axios";
 import {
-  ArrowLeft,
-  Calendar as CalendarIcon,
-  CheckCircle,
-  Clock,
-  FileText,
-  Plus,
-  XCircle
+    ArrowLeft,
+    Calendar as CalendarIcon,
+    CheckCircle,
+    Clock,
+    FileText,
+    Plus,
+    XCircle
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+    ActivityIndicator,
+    Alert,
+    Keyboard,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSession } from "../ctx";
@@ -52,10 +52,10 @@ type LeaveType = {
 // ✅ Leave balance type
 type LeaveBalance = {
   leaveTypeId: number;
-  leaveTypeName: string;
-  totalAccrued: number;
-  monthlyQuota: number;
-  applicableTo: string;
+  leaveType: string;
+  totalAccrued: number | string | null;
+  totalTaken: number | string | null;
+  balance: number | string | null;
 };
 
 // ✅ Leave request type
@@ -115,7 +115,7 @@ export default function LeavesScreen({ onBack }: LeavesScreenProps) {
 
 
   // ✅ API Configuration
-  const LOCAL_IP = "192.168.100.132";
+  const LOCAL_IP = "192.168.101.25";
   const API_BASE =
     Platform.OS === "android"
       ? "http://10.0.2.2:3000"
@@ -125,21 +125,33 @@ export default function LeavesScreen({ onBack }: LeavesScreenProps) {
   const userName = session?.user?.GR_EMPLOYER_LOGIN?.split("-")[0] || "User";
   const branch = session?.user?.branch || "korangi";
 
-  // ✅ Fetch leave types from database
+  const formatNumber = useCallback((value: number | string | null | undefined) => {
+    const num =
+      typeof value === "number"
+        ? value
+        : value !== null && value !== undefined
+        ? Number(value)
+        : 0;
+    return Number.isFinite(num) ? num : 0;
+  }, []);
+
+  // ✅ Fetch leave types from database (filtered by employee eligibility)
   const fetchLeaveTypes = useCallback(async () => {
+    if (!pinNumber) return;
     try {
-      const res = await axios.get(`${API_BASE}/leave-types?branch=${branch}`);
+      const res = await axios.get(
+        `${API_BASE}/leave-types?branch=${branch}&pinNumber=${pinNumber}`
+      );
       const types: LeaveType[] = res.data || [];
       setLeaveTypes(types);
-      
-      // Set first leave type as default
-      if (types.length > 0 && !selectedLeaveTypeId) {
-        setSelectedLeaveTypeId(types[0].id);
+
+      if (types.length > 0) {
+        setSelectedLeaveTypeId((prev) => prev ?? types[0].id);
       }
     } catch (err) {
       console.error("Error fetching leave types:", err);
     }
-  }, [branch, API_BASE, selectedLeaveTypeId]);
+  }, [branch, API_BASE, pinNumber]);
 
   // ✅ Fetch leave balances
   const fetchLeaveBalances = useCallback(async () => {
@@ -230,7 +242,13 @@ export default function LeavesScreen({ onBack }: LeavesScreenProps) {
       });
 
       if (res.data.success) {
-        Alert.alert("✅ Success", `Leave request submitted successfully!\nDays: ${res.data.daysRequested}`);
+        const requested = res.data.daysRequested;
+        const deduction = res.data.daysDeduction;
+        let successMessage = `Leave request submitted successfully!\nRequested Days: ${requested}`;
+        if (typeof deduction === "number") {
+          successMessage += `\nDeduction: ${deduction}`;
+        }
+        Alert.alert("✅ Success", successMessage);
         
         // Reset form
         if (leaveTypes.length > 0) {
@@ -482,16 +500,38 @@ export default function LeavesScreen({ onBack }: LeavesScreenProps) {
           <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
             <Text style={styles.sectionTitle}>Your Leave Balance</Text>
             <View style={styles.balanceContainer}>
-              {leaveBalances.map((balance) => (
-                <View key={balance.leaveTypeId} style={styles.balanceCard}>
-                  <Text style={styles.balanceType}>{balance.leaveTypeName}</Text>
-                  <Text style={styles.balanceAmount}>{balance.totalAccrued.toFixed(2)}</Text>
-                  <Text style={styles.balanceQuota}>
-                    Quota: {balance.monthlyQuota}/month
+              {leaveBalances.map((balance) => {
+                const available = formatNumber(balance.balance);
+                const taken = formatNumber(balance.totalTaken);
+                const leaveTypeName = balance.leaveType?.toLowerCase() || "";
+                let annualAllowance = available + taken; // fallback: actual accrued
+                if (leaveTypeName.includes("sick")) {
+                  annualAllowance = 0.67 * 12; // 8.04
+                } else if (leaveTypeName.includes("casual")) {
+                  annualAllowance = 0.8 * 12; // 9.60
+                } else if (leaveTypeName.includes("earned")) {
+                  annualAllowance = 1.17 * 12; // 14.04
+                }
+                const computedAvailable = annualAllowance - taken;
+
+                return (
+                  <View key={balance.leaveTypeId} style={styles.balanceCard}>
+                  <Text style={styles.balanceType}>{balance.leaveType}</Text>
+                  <Text style={styles.balanceAmount}>
+                    {computedAvailable.toFixed(2)}
                   </Text>
-                  <Text style={styles.balancePeriod}>{balance.applicableTo}</Text>
+                  <Text style={styles.balanceLabel}>Available days</Text>
+                  <View style={styles.balanceMetaRow}>
+                    <Text style={styles.balanceMeta}>
+                      Accrued: {annualAllowance.toFixed(2)}
+                    </Text>
+                    <Text style={styles.balanceMeta}>
+                      Taken: {taken.toFixed(2)}
+                    </Text>
+                  </View>
                 </View>
-              ))}
+                );
+              })}
             </View>
           </View>
         )}
@@ -596,6 +636,15 @@ export default function LeavesScreen({ onBack }: LeavesScreenProps) {
                           </View>
                         </View>
                       )}
+                    </View>
+                  )}
+
+                  {typeof leave.daysDeduction === "number" && (
+                    <View style={styles.metaRow}>
+                      <Text style={styles.metaLabel}>Deduction</Text>
+                      <Text style={styles.metaValue}>
+                        {Number(leave.daysDeduction).toFixed(2)}
+                      </Text>
                     </View>
                   )}
 
@@ -1054,6 +1103,21 @@ const styles = StyleSheet.create({
     color: "#666",
     lineHeight: 16,
   },
+  metaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 6,
+  },
+  metaLabel: {
+    fontSize: 11,
+    color: "#9ca3af",
+    fontWeight: "600",
+  },
+  metaValue: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#1f2937",
+  },
 
   errorContainer: {
     flex: 1,
@@ -1105,14 +1169,20 @@ const styles = StyleSheet.create({
     color: "#00A652",
     marginBottom: 4,
   },
-  balanceQuota: {
+  balanceLabel: {
     fontSize: 11,
-    color: "#999",
+    color: "#6b7280",
+    fontWeight: "600",
   },
-  balancePeriod: {
-    fontSize: 10,
-    color: "#999",
-    marginTop: 2,
+  balanceMetaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 6,
+  },
+  balanceMeta: {
+    fontSize: 11,
+    color: "#94a3b8",
+    fontWeight: "600",
   },
 
   // Modal styles

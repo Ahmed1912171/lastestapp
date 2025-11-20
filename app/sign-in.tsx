@@ -21,14 +21,16 @@ export default function LoginScreen() {
   const { signIn } = useSession();
   const router = useRouter();
 
-  const [username, setUsername] = useState("140822-52374");
+
+//  const [username, setUsername] = useState("120822-0007"); dr shahid raza
+  const [username, setUsername] = useState("010723-0242");
   const [password, setPassword] = useState("Sichn"); // ✅ Master password required for all users
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [bgLoaded, setBgLoaded] = useState(false); // ✅ track bg preload
 
-  const LOCAL_IP = "192.168.100.132";
+  const LOCAL_IP = "192.168.101.25";
 
   const API_URL =
     Platform.OS === "android"

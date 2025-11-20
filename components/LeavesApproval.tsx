@@ -1,26 +1,26 @@
 import axios from "axios";
 import {
-  ArrowLeft,
-  Calendar as CalendarIcon,
-  CheckCircle,
-  ClipboardList,
-  Clock,
-  FileText,
-  User,
-  XCircle,
+    ArrowLeft,
+    Calendar as CalendarIcon,
+    CheckCircle,
+    ClipboardList,
+    Clock,
+    FileText,
+    User,
+    XCircle,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSession } from "../ctx";
@@ -37,6 +37,7 @@ type PendingLeave = {
   status: string;
   requestDate: string;
   employeeName?: string;
+  requesterManagerStatus?: number;
 };
 
 type LeavesApprovalProps = {
@@ -50,7 +51,7 @@ export default function LeavesApproval({ onBack }: LeavesApprovalProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [actionId, setActionId] = useState<number | null>(null);
 
-  const LOCAL_IP = "192.168.100.132";
+  const LOCAL_IP = "192.168.101.25";
   const API_BASE =
     Platform.OS === "android" ? "http://10.0.2.2:3000" : `http://${LOCAL_IP}:3000`;
 
@@ -59,12 +60,13 @@ export default function LeavesApproval({ onBack }: LeavesApprovalProps) {
     (session?.user as any)?.ADMIN_FIRST_NAME ||
     session?.user?.GR_EMPLOYER_LOGIN?.split("-")[0] ||
     "Manager";
+  const approverManagerStatus = (session?.user as any)?.manager_status || 0;
 
   const fetchPendingLeaves = useCallback(async () => {
     try {
       setLoading(true);
       const res = await axios.get(
-        `${API_BASE}/leaves/pending/all?branch=${encodeURIComponent(branch)}`
+        `${API_BASE}/leaves/pending/all?branch=${encodeURIComponent(branch)}&approverManagerStatus=${approverManagerStatus}`
       );
       setRequests(res.data || []);
     } catch (err) {
@@ -73,7 +75,7 @@ export default function LeavesApproval({ onBack }: LeavesApprovalProps) {
     } finally {
       setLoading(false);
     }
-  }, [API_BASE, branch]);
+  }, [API_BASE, branch, approverManagerStatus]);
 
   useEffect(() => {
     fetchPendingLeaves();
@@ -96,17 +98,40 @@ export default function LeavesApproval({ onBack }: LeavesApprovalProps) {
   };
 
   const handleApprove = async (request: PendingLeave) => {
+    // ✅ Authorization checks based on approver's manager_status
+    if (approverManagerStatus === 1) {
+      // Manager (status = 1) cannot approve other managers
+      if (request.requesterManagerStatus === 1) {
+        Alert.alert(
+          "Cannot Approve",
+          "Managers cannot approve other manager's leave requests. Only non-managers can be approved by managers."
+        );
+        return;
+      }
+    } else if (approverManagerStatus === 2) {
+      // Senior Manager (status = 2) can only approve managers with status = 1
+      if (request.requesterManagerStatus !== 1) {
+        Alert.alert(
+          "Cannot Approve",
+          "Senior managers can only approve leave requests from managers (manager_status = 1)."
+        );
+        return;
+      }
+    }
+
     try {
       setActionId(request.id);
       await axios.put(`${API_BASE}/leaves/${request.id}/approve`, {
         approvedBy: approverName,
         branch,
+        approverManagerStatus,
       });
       removeRequestById(request.id);
       Alert.alert("Approved", "Leave request approved successfully.");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error approving leave:", err);
-      Alert.alert("Error", "Failed to approve leave request.");
+      const errorMessage = err?.response?.data?.error || "Failed to approve leave request.";
+      Alert.alert("Error", errorMessage);
     } finally {
       setActionId(null);
     }
@@ -203,10 +228,17 @@ export default function LeavesApproval({ onBack }: LeavesApprovalProps) {
                 <View style={styles.leaveCardHeader}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.leaveTypeText}>{request.leaveType || "Leave Type"}</Text>
-                    <Text style={styles.employeeText}>
-                      <User size={14} color="#6b7280" />{" "}
-                      {request.employeeName || `PIN ${request.pinNumber}`}
-                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 }}>
+                      <User size={14} color="#6b7280" />
+                      <Text style={styles.employeeText}>
+                        {request.employeeName || `PIN ${request.pinNumber}`}
+                      </Text>
+                      {request.requesterManagerStatus === 1 && (
+                        <View style={styles.managerBadge}>
+                          <Text style={styles.managerBadgeText}>Manager</Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
                   <View style={styles.statusBadge}>
                     <Text style={styles.statusText}>{request.status}</Text>
@@ -250,36 +282,54 @@ export default function LeavesApproval({ onBack }: LeavesApprovalProps) {
                   </View>
                 ) : null}
 
-                <View style={styles.actionsRow}>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.rejectButton]}
-                    onPress={() => handleReject(request)}
-                    disabled={actionId === request.id}
-                  >
-                    {actionId === request.id ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <>
-                        <XCircle size={18} color="#fff" />
-                        <Text style={styles.actionText}>Reject</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.approveButton]}
-                    onPress={() => handleApprove(request)}
-                    disabled={actionId === request.id}
-                  >
-                    {actionId === request.id ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <>
-                        <CheckCircle size={18} color="#fff" />
-                        <Text style={styles.actionText}>Approve</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                </View>
+                {/* ✅ Show buttons based on approver's manager_status */}
+                {approverManagerStatus === 1 && request.requesterManagerStatus === 1 ? (
+                  // Manager (status = 1) cannot approve other managers
+                  <View style={styles.restrictedMessage}>
+                    <Text style={styles.restrictedText}>
+                      ⚠️ Managers cannot approve this request
+                    </Text>
+                  </View>
+                ) : approverManagerStatus === 2 && request.requesterManagerStatus !== 1 ? (
+                  // Senior Manager (status = 2) can only approve managers with status = 1
+                  <View style={styles.restrictedMessage}>
+                    <Text style={styles.restrictedText}>
+                      ⚠️ Senior managers can only approve requests from managers
+                    </Text>
+                  </View>
+                ) : (
+                  // Show approve/reject buttons for valid combinations
+                  <View style={styles.actionsRow}>
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.rejectButton]}
+                      onPress={() => handleReject(request)}
+                      disabled={actionId === request.id}
+                    >
+                      {actionId === request.id ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <>
+                          <XCircle size={18} color="#fff" />
+                          <Text style={styles.actionText}>Reject</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.approveButton]}
+                      onPress={() => handleApprove(request)}
+                      disabled={actionId === request.id}
+                    >
+                      {actionId === request.id ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <>
+                          <CheckCircle size={18} color="#fff" />
+                          <Text style={styles.actionText}>Approve</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             ))}
           </View>
@@ -481,5 +531,28 @@ const styles = StyleSheet.create({
   actionText: {
     color: "#fff",
     fontWeight: "600",
+  },
+  managerBadge: {
+    backgroundColor: "#fef3c7",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  managerBadgeText: {
+    color: "#b45309",
+    fontWeight: "600",
+    fontSize: 10,
+  },
+  restrictedMessage: {
+    backgroundColor: "#fee2e2",
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 8,
+  },
+  restrictedText: {
+    color: "#991b1b",
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "center",
   },
 });

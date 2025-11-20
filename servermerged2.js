@@ -106,6 +106,34 @@ const safeHandler = (fn) => async (req, res) => {
 };
 
 // ==========================
+// 🔢 PIN NUMBER NORMALIZER
+// ==========================
+const normalizePinNumber = (value) => {
+  if (value === undefined || value === null) return null;
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  // Prefer the last segment if GR_EMPLOYER_LOGIN-style value provided
+  const segment = raw.includes("-") ? raw.split("-").pop() : raw;
+  const digitsOnly = segment.replace(/\D/g, "");
+
+  if (digitsOnly.length > 0) {
+    const parsedDigits = parseInt(digitsOnly, 10);
+    if (Number.isFinite(parsedDigits) && parsedDigits > 0) {
+      return parsedDigits;
+    }
+  }
+
+  const parsedRaw = parseInt(raw, 10);
+  if (Number.isFinite(parsedRaw) && parsedRaw > 0) {
+    return parsedRaw;
+  }
+
+  return null;
+};
+
+// ==========================
 // 🌐 HEALTH CHECK
 // ==========================
 app.get(
@@ -1243,23 +1271,144 @@ app.post(
 // 🕐 ATTENDANCE ENDPOINTS
 // ==========================
 
-// ✅ Get attendance history for a user
+// ✅ Check attendance status for notifications
+app.get(
+  "/attendance/check-today",
+  safeHandler(async (req, res) => {
+    const branch = req.query.branch || "korangi";
+    const pinNumber = req.query.pinNumber;
+    const db = await getDb(branch);
+
+    console.log("📥 Received attendance check request:", {
+      pinNumber,
+      branch,
+      query: req.query,
+    });
+
+    const pinNumberInt = normalizePinNumber(pinNumber);
+    console.log("🔢 Parsed pinNumber:", {
+      original: pinNumber,
+      parsed: pinNumberInt,
+      normalized: true,
+      isValid: !!pinNumberInt,
+    });
+
+    if (!pinNumberInt) {
+      console.log("⚠️ Attendance check: Unable to normalize pinNumber", {
+        pinNumber,
+      });
+      return res.json({
+        hasAttendance: false,
+        hasCheckIn: false,
+        hasCheckOut: false,
+        isAfterCutoff: false,
+        needsNotification: false,
+        message: "pinNumber missing",
+      });
+    }
+
+    // Use local date to match database (not UTC)
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const today = `${year}-${month}-${day}`; // YYYY-MM-DD (local date)
+
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentMinutes = currentHour * 60 + currentMinute;
+    const cutoffMinutes = 9 * 60 + 15; // 9:15 AM = 555 minutes
+    const checkoutCutoffMinutes = 17 * 60; // 5:00 PM = 1020 minutes
+
+    console.log("🔍 Query parameters:", {
+      pinNumberInt,
+      today,
+      currentTime: `${currentHour}:${String(currentMinute).padStart(2, "0")}`,
+    });
+
+    // Check today's attendance records (both check-in and check-out)
+    const [attendanceRecords] = await db.query(
+      `SELECT AttendanceID, Status, AttendanceTime, AttendanceDate
+       FROM as_attendance 
+       WHERE PinNumber = ? AND AttendanceDate = ?
+       ORDER BY AttendanceID DESC`,
+      [pinNumberInt, today]
+    );
+
+    console.log("📋 Found attendance records:", attendanceRecords.length);
+    if (attendanceRecords.length > 0) {
+      console.log(
+        "📋 Records:",
+        attendanceRecords.map((r) => ({
+          AttendanceID: r.AttendanceID,
+          Status: r.Status,
+          AttendanceDate: r.AttendanceDate,
+          AttendanceTime: r.AttendanceTime,
+        }))
+      );
+    }
+
+    const hasCheckIn = attendanceRecords.some(
+      (record) => record.Status === 1
+    );
+    const hasCheckOut = attendanceRecords.some(
+      (record) => record.Status === 2
+    );
+    const hasAttendance = hasCheckIn || hasCheckOut;
+    const isAfterCutoff = currentMinutes > cutoffMinutes;
+    const needsNotification = !hasCheckIn && isAfterCutoff;
+    const isAfterCheckoutCutoff = currentMinutes > checkoutCutoffMinutes;
+    const needsCheckoutReminder = hasCheckIn && !hasCheckOut && isAfterCheckoutCutoff;
+
+    console.log("📊 Attendance check result:", {
+      pinNumber: pinNumberInt,
+      today,
+      recordsFound: attendanceRecords.length,
+      hasAttendance,
+      hasCheckIn,
+      hasCheckOut,
+      currentTime: `${currentHour}:${String(currentMinute).padStart(2, "0")}`,
+      isAfterCutoff,
+      isAfterCheckoutCutoff,
+      needsNotification,
+      needsCheckoutReminder,
+    });
+
+    res.json({
+      hasAttendance,
+      hasCheckIn,
+      hasCheckOut,
+      isAfterCutoff,
+      needsNotification,
+      isAfterCheckoutCutoff,
+      needsCheckoutReminder,
+      currentTime: `${currentHour}:${String(currentMinute).padStart(2, "0")}`,
+    });
+  })
+);
+
+// ✅ Get attendance history for a user (used by mobile Attendance screen)
 app.get(
   "/attendance/:pinNumber",
   safeHandler(async (req, res) => {
     const branch = req.query.branch || "korangi";
     const db = await getDb(branch);
     const { pinNumber } = req.params;
-    const limit = parseInt(req.query.limit) || 30;
+    const limit = parseInt(req.query.limit, 10) || 30;
 
-    // ✅ Remove leading zeros from PinNumber
-    const pinNumberInt = parseInt(pinNumber, 10);
+    const pinNumberInt = normalizePinNumber(pinNumber);
+    if (!pinNumberInt) {
+      console.log("⚠️ Attendance history: Unable to normalize pinNumber", {
+        pinNumber,
+      });
+      return res.json([]);
+    }
 
     console.log("📥 Fetching attendance history:", {
       pinNumber,
-      pinNumberInt,
+      parsed: pinNumberInt,
       branch,
-      limit
+      limit,
     });
 
     const [results] = await db.query(
@@ -1279,11 +1428,6 @@ app.get(
       LIMIT ?`,
       [pinNumberInt, limit]
     );
-
-    console.log("📊 Found records:", results.length);
-    if (results.length > 0) {
-      console.log("📋 First record:", results[0]);
-    }
 
     res.json(results);
   })
@@ -1574,6 +1718,125 @@ app.post(
 );
 
 // ==========================
+// 🍃 LEAVE MANAGEMENT HELPERS
+// ==========================
+
+const getEmployeeProfile = async (db, employeeId) => {
+  if (!employeeId) return null;
+
+  const [rows] = await db.query(
+    `SELECT 
+      emp_type AS empType, 
+      EIS_GENDER AS gender
+    FROM eis_personal_information 
+    WHERE empid = ? 
+    LIMIT 1`,
+    [employeeId]
+  );
+
+  if (!rows || rows.length === 0) {
+    return null;
+  }
+
+  return rows[0];
+};
+
+const getAllowedLeaveTypeIds = (empType, gender) => {
+  const normalizedType = (empType || "").trim().toUpperCase();
+  const normalizedGender = (gender || "").trim().toLowerCase();
+
+  if (normalizedType === "TCO") {
+    return [4];
+  }
+
+  if (normalizedGender === "female") {
+    return [1, 2, 3, 5, 6];
+  }
+
+  // Default male/non-TCO set
+  return [1, 2, 3, 5];
+};
+
+const getCurrentMonthRange = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const start = `${year}-${month}-01`;
+  const endDate = new Date(year, now.getMonth() + 1, 0).getDate();
+  const end = `${year}-${month}-${String(endDate).padStart(2, "0")}`;
+  return { start, end };
+};
+
+const fetchShiftLeaveMap = async (db, employeeId, startDate, endDate) => {
+  if (!employeeId || !startDate || !endDate) {
+    return new Map();
+  }
+
+  const [rows] = await db.query(
+    `SELECT 
+        roster.dates AS dateValue, 
+        shift.shift_leave_calculation AS leaveCalc
+     FROM tr_duty_roster AS roster
+     JOIN as_shift AS shift ON shift.id = roster.shift_new
+     WHERE roster.face_id = ?
+       AND roster.dates BETWEEN ? AND ?`,
+    [employeeId, startDate, endDate]
+  );
+
+  const map = new Map();
+  rows.forEach((row) => {
+    const rawDate =
+      row.dateValue instanceof Date
+        ? row.dateValue.toISOString()
+        : String(row.dateValue);
+    const dateKey = rawDate.includes("T")
+      ? rawDate.split("T")[0]
+      : rawDate.split(" ")[0];
+
+    const calc = parseFloat(row.leaveCalc);
+    if (!Number.isNaN(calc)) {
+      map.set(dateKey, calc);
+    }
+  });
+
+  return map;
+};
+
+const calculateShiftDeduction = (shiftMap, startDate, endDate) => {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
+    return 0;
+  }
+
+  let deduction = 0;
+  const cursor = new Date(start);
+
+  while (cursor <= end) {
+    const key = cursor.toISOString().split("T")[0];
+    const value = shiftMap.get(key);
+    deduction += typeof value === "number" && !Number.isNaN(value) ? value : 1;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return deduction < 1 ? 1 : deduction;
+};
+
+const hasOverlappingLeave = async (db, employeeId, startDate, endDate) => {
+  const [rows] = await db.query(
+    `SELECT COUNT(*) AS count
+     FROM leave_requests_fth
+     WHERE employee_id = ?
+       AND start_date <= ?
+       AND end_date >= ?`,
+    [employeeId, endDate, startDate]
+  );
+
+  return rows[0]?.count > 0;
+};
+
+// ==========================
 // 🍃 LEAVE MANAGEMENT ENDPOINTS
 // ==========================
 
@@ -1582,7 +1845,25 @@ app.get(
   "/leave-types",
   safeHandler(async (req, res) => {
     const branch = req.query.branch || "korangi";
+    const pinNumber = req.query.pinNumber;
     const db = await getDb(branch);
+
+    const employeeId = parseInt(pinNumber, 10);
+    if (!employeeId) {
+      return res.status(400).json({ error: "pinNumber is required" });
+    }
+
+    const employeeProfile = await getEmployeeProfile(db, employeeId);
+    const allowedTypeIds = getAllowedLeaveTypeIds(
+      employeeProfile?.empType,
+      employeeProfile?.gender
+    );
+
+    if (!allowedTypeIds.length) {
+      return res.json([]);
+    }
+
+    const placeholders = allowedTypeIds.map(() => "?").join(", ");
 
     const [results] = await db.query(
       `SELECT 
@@ -1591,7 +1872,9 @@ app.get(
         applicable_to as applicableTo,
         monthly_quota as monthlyQuota
       FROM leave_types_fth
-      ORDER BY leave_type_id`
+      WHERE leave_type_id IN (${placeholders})
+      ORDER BY leave_type_id`,
+      allowedTypeIds
     );
 
     res.json(results);
@@ -1610,27 +1893,66 @@ app.get(
 
     try {
       console.log("📥 Fetching leave balance for employee_id:", pinNumberInt);
-      
-      // Get current balances grouped by leave type
+
+      const employeeProfile = await getEmployeeProfile(db, pinNumberInt);
+      const allowedTypeIds = getAllowedLeaveTypeIds(
+        employeeProfile?.empType,
+        employeeProfile?.gender
+      );
+
+      if (!allowedTypeIds.length) {
+        return res.json([]);
+      }
+
+      const placeholders = allowedTypeIds.map(() => "?").join(", ");
+      const isTco = (employeeProfile?.empType || "").trim().toUpperCase() === "TCO";
+      const { start: monthStart, end: monthEnd } = getCurrentMonthRange();
+
+      const params = [
+        pinNumberInt,
+        ...(isTco ? [monthStart, monthEnd] : []),
+        pinNumberInt,
+        ...(isTco ? [monthStart, monthEnd] : []),
+        ...allowedTypeIds,
+      ];
+
       const [balances] = await db.query(
         `SELECT 
-          la.leave_type_id as leaveTypeId,
-          lt.name as leaveTypeName,
-          SUM(la.accrued_amount) as totalAccrued,
-          lt.monthly_quota as monthlyQuota,
-          lt.applicable_to as applicableTo
-        FROM leave_accruals_fth la
-        LEFT JOIN leave_types_fth lt ON la.leave_type_id = lt.leave_type_id
-        WHERE la.employee_id = ?
-        GROUP BY la.leave_type_id, lt.name, lt.monthly_quota, lt.applicable_to`,
-        [pinNumberInt]
+          lt.leave_type_id AS leaveTypeId,
+          lt.name AS leaveType,
+          COALESCE(la.total_accrued, 0) AS totalAccrued,
+          COALESCE(lr.total_taken, 0) AS totalTaken,
+          (COALESCE(la.total_accrued, 0) - COALESCE(lr.total_taken, 0)) AS balance
+        FROM leave_types_fth lt
+        LEFT JOIN (
+          SELECT leave_type_id, SUM(accrued_amount) AS total_accrued
+          FROM leave_accruals_fth
+          WHERE employee_id = ?
+          ${isTco ? "AND accrual_date BETWEEN ? AND ?" : ""}
+          GROUP BY leave_type_id
+        ) la ON la.leave_type_id = lt.leave_type_id
+        LEFT JOIN (
+          SELECT leave_type_id, SUM(total_days) AS total_taken
+          FROM leave_requests_fth
+          WHERE employee_id = ?
+            AND status = 'Approved'
+            ${isTco ? "AND start_date BETWEEN ? AND ?" : ""}
+          GROUP BY leave_type_id
+        ) lr ON lr.leave_type_id = lt.leave_type_id
+        WHERE lt.leave_type_id IN (${placeholders})
+        ORDER BY lt.leave_type_id`,
+        params
       );
 
       console.log("✅ Leave balance results:", balances.length, "records found");
       res.json(balances);
     } catch (err) {
-      // Employee might not have accruals yet or table doesn't exist - return empty array
-      console.log("⚠️ Error fetching leave balance for employee", pinNumberInt, ":", err.message);
+      console.log(
+        "⚠️ Error fetching leave balance for employee",
+        pinNumberInt,
+        ":",
+        err.message
+      );
       res.json([]);
     }
   })
@@ -1695,12 +2017,53 @@ app.post(
     }
 
     const pinNumberInt = parseInt(pinNumber, 10);
+    const leaveTypeInt = parseInt(leaveTypeId, 10);
 
-    // ✅ Calculate days requested
+    if (!pinNumberInt) {
+      return res.status(400).json({ error: "Invalid pinNumber" });
+    }
+    if (!leaveTypeInt) {
+      return res.status(400).json({ error: "Invalid leaveTypeId" });
+    }
+
     const start = new Date(startDate);
     const end = new Date(endDate);
+
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return res.status(400).json({ error: "Invalid date format" });
+    }
+
+    if (start > end) {
+      return res.status(400).json({ error: "End date cannot be before start date" });
+    }
+
+    const employeeProfile = await getEmployeeProfile(db, pinNumberInt);
+    const allowedTypeIds = getAllowedLeaveTypeIds(
+      employeeProfile?.empType,
+      employeeProfile?.gender
+    );
+
+    if (!allowedTypeIds.includes(leaveTypeInt)) {
+      return res.status(403).json({
+        error: "Selected leave type is not allowed for this employee",
+      });
+    }
+
+    const overlapExists = await hasOverlappingLeave(db, pinNumberInt, startDate, endDate);
+    if (overlapExists) {
+      return res.status(409).json({
+        error: "You already have a leave request for the selected date range.",
+      });
+    }
+
     const diffTime = Math.abs(end.getTime() - start.getTime());
     const totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+    const shiftMap = await fetchShiftLeaveMap(db, pinNumberInt, startDate, endDate);
+    let totalDaysDeduction = calculateShiftDeduction(shiftMap, startDate, endDate);
+    if (totalDaysDeduction === 0) {
+      totalDaysDeduction = totalDays;
+    }
 
     console.log("📝 Inserting leave request:", {
       employee_id: pinNumberInt,
@@ -1708,15 +2071,23 @@ app.post(
       start_date: startDate,
       end_date: endDate,
       total_days: totalDays,
-      reason: reason
+      total_days_deduction: totalDaysDeduction,
+      reason,
     });
 
-    // ✅ Insert into existing leave_requests_fth table
     const [result] = await db.query(
       `INSERT INTO leave_requests_fth 
         (employee_id, leave_type_id, start_date, end_date, total_days, total_days_deduction, status, reason, current_stage)
       VALUES (?, ?, ?, ?, ?, ?, 'Pending', ?, NULL)`,
-      [pinNumberInt, leaveTypeId, startDate, endDate, totalDays, totalDays, reason]
+      [
+        pinNumberInt,
+        leaveTypeInt,
+        startDate,
+        endDate,
+        totalDays,
+        totalDaysDeduction,
+        reason,
+      ]
     );
 
     console.log("✅ Leave request inserted with ID:", result.insertId);
@@ -1726,6 +2097,7 @@ app.post(
       message: "Leave request submitted successfully",
       leaveId: result.insertId,
       daysRequested: totalDays,
+      daysDeduction: totalDaysDeduction,
     });
   })
 );
@@ -1737,12 +2109,54 @@ app.put(
     const branch = req.body.branch || req.query.branch || "korangi";
     const db = await getDb(branch);
     const { id } = req.params;
-    const { approvedBy } = req.body;
+    const { approvedBy, approverGR_EMPLOYER_LOGIN, approverManagerStatus } = req.body;
 
     if (!approvedBy) {
       return res.status(400).json({ error: "approvedBy is required" });
     }
 
+    const approverStatus = approverManagerStatus ? parseInt(approverManagerStatus) : 0;
+
+    // ✅ First, get the leave request to check if requester is a manager
+    const [leaveRequest] = await db.query(
+      `SELECT 
+        lr.employee_id,
+        a.GR_EMPLOYER_LOGIN as requesterGR_EMPLOYER_LOGIN,
+        COALESCE(epi.manager_status, 0) as requesterManagerStatus
+      FROM leave_requests_fth lr
+      LEFT JOIN admin a ON lr.employee_id = CAST(SUBSTRING_INDEX(a.GR_EMPLOYER_LOGIN, '-', -1) AS UNSIGNED)
+      LEFT JOIN eis_personal_information epi ON epi.EIS_EMPLOYEE_CODE = a.GR_EMPLOYER_LOGIN
+      WHERE lr.leave_id = ? AND lr.status = 'Pending'`,
+      [id]
+    );
+
+    if (leaveRequest.length === 0) {
+      return res.status(404).json({ error: "Leave request not found or already processed" });
+    }
+
+    const requester = leaveRequest[0];
+    
+    // ✅ Authorization logic based on approver's manager_status
+    // manager_status = 1: Can only approve non-managers (manager_status = 0)
+    // manager_status = 2: Can approve managers with manager_status = 1
+    if (approverStatus === 1) {
+      // Manager (status = 1) cannot approve other managers
+      if (requester.requesterManagerStatus === 1) {
+        return res.status(403).json({ 
+          error: "Managers cannot approve other managers' leave requests. Only non-managers can be approved by managers." 
+        });
+      }
+    } else if (approverStatus === 2) {
+      // Senior Manager (status = 2) can only approve managers with status = 1
+      if (requester.requesterManagerStatus !== 1) {
+        return res.status(403).json({ 
+          error: "Senior managers can only approve leave requests from managers (manager_status = 1)." 
+        });
+      }
+    }
+    // If approverStatus is 0 or not provided, allow approval (for backward compatibility)
+
+    // ✅ Proceed with approval
     const [result] = await db.query(
       `UPDATE leave_requests_fth 
        SET status = 'Approved', approved_by = ?
@@ -1797,7 +2211,19 @@ app.get(
   "/leaves/pending/all",
   safeHandler(async (req, res) => {
     const branch = req.query.branch || "korangi";
+    const approverManagerStatus = parseInt(req.query.approverManagerStatus) || 0;
     const db = await getDb(branch);
+
+    // ✅ Build WHERE clause based on approver's manager_status
+    // manager_status = 1: Can only see non-managers (manager_status = 0 or null)
+    // manager_status = 2: Can only see managers with manager_status = 1
+    let statusFilter = "";
+    if (approverManagerStatus === 1) {
+      statusFilter = "AND COALESCE(epi.manager_status, 0) = 0";
+    } else if (approverManagerStatus === 2) {
+      statusFilter = "AND COALESCE(epi.manager_status, 0) = 1";
+    }
+    // If approverManagerStatus is 0 or not provided, show all (for backward compatibility)
 
     const [results] = await db.query(
       `SELECT 
@@ -1811,15 +2237,135 @@ app.get(
         lr.reason,
         lr.status,
         DATE_FORMAT(lr.start_date, '%Y-%m-%d') as requestDate,
-        a.GR_EMPLOYER_LOGIN as employeeName
+        a.GR_EMPLOYER_LOGIN as employeeCode,
+        CONCAT(COALESCE(a.ADMIN_FIRST_NAME, ''), ' ', COALESCE(a.ADMIN_LAST_NAME, '')) as employeeName,
+        a.ADMIN_FIRST_NAME,
+        a.ADMIN_LAST_NAME,
+        COALESCE(epi.manager_status, 0) as requesterManagerStatus
       FROM leave_requests_fth lr
       LEFT JOIN leave_types_fth lt ON lr.leave_type_id = lt.leave_type_id
       LEFT JOIN admin a ON lr.employee_id = CAST(SUBSTRING_INDEX(a.GR_EMPLOYER_LOGIN, '-', -1) AS UNSIGNED)
-      WHERE lr.status = 'Pending'
+      LEFT JOIN eis_personal_information epi ON epi.EIS_EMPLOYEE_CODE = a.GR_EMPLOYER_LOGIN
+      WHERE lr.status = 'Pending' ${statusFilter}
       ORDER BY lr.leave_id DESC`
     );
 
     res.json(results);
+  })
+);
+
+// ✅ Check attendance status for notifications
+app.get(
+  "/attendance/check-today",
+  safeHandler(async (req, res) => {
+    const branch = req.query.branch || "korangi";
+    const pinNumber = req.query.pinNumber;
+    const db = await getDb(branch);
+
+    console.log("📥 Received attendance check request:", { pinNumber, branch, query: req.query });
+    
+    const pinNumberInt = normalizePinNumber(pinNumber);
+    console.log("🔢 Parsed pinNumber:", {
+      original: pinNumber,
+      parsed: pinNumberInt,
+      normalized: true,
+      isValid: !!pinNumberInt,
+    });
+    
+    if (!pinNumberInt) {
+      console.log("⚠️ Attendance check: Unable to normalize pinNumber", { pinNumber });
+      return res.json({
+        hasAttendance: false,
+        hasCheckIn: false,
+        hasCheckOut: false,
+        isAfterCutoff: false,
+        needsNotification: false,
+        message: "pinNumber missing",
+      });
+    }
+    
+    console.log("🔍 Checking attendance for:", { 
+      pinNumber, 
+      pinNumberInt, 
+      branch,
+      parsedValue: pinNumberInt,
+      isValid: !isNaN(pinNumberInt) && pinNumberInt > 0
+    });
+
+    // Use local date to match database (not UTC)
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const today = `${year}-${month}-${day}`; // YYYY-MM-DD (local date)
+    
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentMinutes = currentHour * 60 + currentMinute;
+    const cutoffMinutes = 9 * 60 + 15; // 9:15 AM = 555 minutes
+    const checkoutCutoffMinutes = 17 * 60; // 5:00 PM = 1020 minutes
+
+    console.log("🔍 Query parameters:", {
+      pinNumberInt,
+      today,
+      queryDate: today,
+      currentTime: `${currentHour}:${String(currentMinute).padStart(2, "0")}`,
+    });
+
+    // Check today's attendance records (both check-in and check-out)
+    const [attendanceRecords] = await db.query(
+      `SELECT AttendanceID, Status, AttendanceTime, AttendanceDate
+       FROM as_attendance 
+       WHERE PinNumber = ? AND AttendanceDate = ?
+       ORDER BY AttendanceID DESC`,
+      [pinNumberInt, today]
+    );
+
+    console.log("📋 Found attendance records:", attendanceRecords.length);
+    if (attendanceRecords.length > 0) {
+      console.log("📋 Records:", attendanceRecords.map(r => ({
+        AttendanceID: r.AttendanceID,
+        Status: r.Status,
+        AttendanceDate: r.AttendanceDate,
+        AttendanceTime: r.AttendanceTime
+      })));
+    }
+
+    const hasCheckIn = attendanceRecords.some((record) => record.Status === 1);
+    const hasCheckOut = attendanceRecords.some((record) => record.Status === 2);
+    const hasAttendance = hasCheckIn || hasCheckOut;
+    const isAfterCutoff = currentMinutes > cutoffMinutes;
+    const needsNotification = !hasCheckIn && isAfterCutoff;
+    const isAfterCheckoutCutoff = currentMinutes > checkoutCutoffMinutes;
+    const needsCheckoutReminder = hasCheckIn && !hasCheckOut && isAfterCheckoutCutoff;
+
+    console.log("📊 Attendance check result:", {
+      pinNumber: pinNumberInt,
+      today,
+      recordsFound: attendanceRecords.length,
+      hasAttendance,
+      hasCheckIn,
+      hasCheckOut,
+      currentTime: `${currentHour}:${String(currentMinute).padStart(2, "0")}`,
+      currentMinutes,
+      cutoffMinutes,
+      checkoutCutoffMinutes,
+      isAfterCutoff,
+      isAfterCheckoutCutoff,
+      needsNotification,
+      needsCheckoutReminder,
+    });
+
+    res.json({
+      hasAttendance,
+      hasCheckIn,
+      hasCheckOut,
+      isAfterCutoff,
+      needsNotification,
+      isAfterCheckoutCutoff,
+      needsCheckoutReminder,
+      currentTime: `${currentHour}:${String(currentMinute).padStart(2, "0")}`,
+    });
   })
 );
 

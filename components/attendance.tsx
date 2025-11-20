@@ -4,26 +4,26 @@ import axios from "axios";
 import * as Device from "expo-device";
 import * as Location from "expo-location";
 import {
-  ArrowLeft,
-  Calendar,
-  CalendarX,
-  Clock,
-  LogOut,
-  MapPin,
-  UserCheck
+    ArrowLeft,
+    Calendar,
+    CalendarX,
+    Clock,
+    LogOut,
+    MapPin,
+    UserCheck
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSession } from "../ctx";
@@ -196,7 +196,7 @@ export default function AttendanceScreen({ onBack }: AttendanceScreenProps) {
   const [selectedFilter, setSelectedFilter] = useState<'total' | 'ontime' | 'late' | 'early'>('total');
 
   // ✅ API Configuration
-  const LOCAL_IP = "192.168.100.132";
+  const LOCAL_IP = "192.168.101.25";
   const API_BASE =
     Platform.OS === "android"
       ? "http://10.0.2.2:3000"

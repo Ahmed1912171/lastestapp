@@ -25,10 +25,8 @@ export default function HRISScreen() {
       ? session.user.GR_EMPLOYER_LOGIN.split("-")[1]
       : session?.user?.ADMIN_ID
   ) || "----";
-  const isManager =
-    typeof (session?.user as any)?.manager_status === "number"
-      ? (session?.user as any)?.manager_status === 1
-      : true;
+  const managerStatus = (session?.user as any)?.manager_status;
+  const isManager = managerStatus === 1 || managerStatus === 2;
 
   if (activeView === 'attendance') {
     return <AttendanceScreen onBack={() => setActiveView('menu')} />;

@@ -27,7 +27,7 @@ interface Props {
   patientId?: number | null;
 }
 
-const BACKEND_BASE = "http://192.168.100.132:3000";
+const BACKEND_BASE = "http://192.168.101.25:3000";
 
 const AIChatModal: React.FC<Props> = ({ visible, onClose, patientId }) => {
   const [messages, setMessages] = useState<Message[]>([]);

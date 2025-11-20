@@ -2,29 +2,31 @@
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import {
-  Activity,
-  Bed,
-  BedSingle,
-  Hospital,
-  TestTubes,
-  TrendingUp,
-  Users,
-  Warehouse,
+    Activity,
+    Bed,
+    BedSingle,
+    Bell,
+    Hospital,
+    TestTubes,
+    TrendingUp,
+    Users,
+    Warehouse,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AIChatModal from "../../components/AIChatModal";
+import Notifications from "../../components/Notifications";
 import SimpleAvatar from "../../components/SimpleAvatar";
 import SimpleChart from "../../components/SimpleChart";
 import { useSession } from "../../ctx";
@@ -62,12 +64,14 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [today, setToday] = useState("");
   const [showAI, setShowAI] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(0);
 
   // ✅ Total Tests state
   const [testCount, setTestCount] = useState<number | null>(null);
   const [loadingCount, setLoadingCount] = useState(false);
 
-  const LOCAL_IP = "192.168.100.132";
+  const LOCAL_IP = "192.168.101.25";
 
   // ---------- Dynamic Date ----------
   useEffect(() => {
@@ -271,13 +275,36 @@ export default function Dashboard() {
             <Text style={styles.hello}>Hello, {greetingName}!</Text>
             <Text style={styles.date}>{today}</Text>
           </View>
-          <SimpleAvatar fallback="AH" size={48} />
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={styles.notificationButton}
+              onPress={() => setShowNotifications(true)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.bellContainer}>
+                <Bell size={24} color="#333" />
+                {notificationCount > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {notificationCount > 99 ? "99+" : notificationCount}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+            <SimpleAvatar fallback="AH" size={48} />
+          </View>
         </View>
 
         <TouchableOpacity style={styles.fab} onPress={() => setShowAI(true)}>
           <Ionicons name="chatbubble-ellipses-outline" size={28} color="#fff" />
         </TouchableOpacity>
         <AIChatModal visible={showAI} onClose={() => setShowAI(false)} />
+        <Notifications
+          visible={showNotifications}
+          onClose={() => setShowNotifications(false)}
+          onCountChange={setNotificationCount}
+        />
 
         <View style={styles.filters}>
           <View style={[styles.dropdownContainer, { zIndex: 6000 }]}>
@@ -470,7 +497,37 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
   },
-
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  notificationButton: {
+    padding: 8,
+    borderRadius: 20,
+  },
+  bellContainer: {
+    position: "relative",
+  },
+  badge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    backgroundColor: "#ef4444",
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: "#fff",
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 9,
+    fontWeight: "700",
+  },
   hello: { fontSize: 24, fontWeight: "700" },
   date: { color: "#666" },
 

@@ -131,7 +131,7 @@ export default function PatientsScreen() {
   const [aiPatientId, setAiPatientId] = useState<number | null>(null);
 
   // ---------- network / config ----------
-  const LOCAL_IP = "192.168.100.132";
+  const LOCAL_IP = "192.168.101.25";
   const API_BASE =
     Platform.OS === "android"
       ? "http://10.0.2.2:3000"
