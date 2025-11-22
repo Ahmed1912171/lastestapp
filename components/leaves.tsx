@@ -9,7 +9,7 @@ import {
     Plus,
     XCircle
 } from "lucide-react-native";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -29,6 +29,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSession } from "../ctx";
+import { useTheme } from "../ctx/theme";
 import SimpleAvatar from "./SimpleAvatar";
 
 // ✅ Conditional import for native platforms only
@@ -88,6 +89,9 @@ type LeavesScreenProps = {
 
 export default function LeavesScreen({ onBack }: LeavesScreenProps) {
   const { session } = useSession();
+  const { isDarkMode } = useTheme();
+  const palette = useMemo(() => buildLeavesPalette(isDarkMode), [isDarkMode]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
   const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([]);
@@ -115,7 +119,7 @@ export default function LeavesScreen({ onBack }: LeavesScreenProps) {
 
 
   // ✅ API Configuration
-  const LOCAL_IP = "192.168.101.25";
+  const LOCAL_IP = "192.168.100.103";
   const API_BASE =
     Platform.OS === "android"
       ? "http://10.0.2.2:3000"
@@ -392,7 +396,7 @@ export default function LeavesScreen({ onBack }: LeavesScreenProps) {
       {onBack ? (
         <View style={styles.header}>
           <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <ArrowLeft size={24} color="#333" />
+            <ArrowLeft size={24} color={palette.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Leave Requests</Text>
           <View style={{ width: 40 }} />
@@ -423,10 +427,10 @@ export default function LeavesScreen({ onBack }: LeavesScreenProps) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={["#00A652", "#3b82f6"]}
-            tintColor="#00A652"
+            colors={[palette.accent, palette.accentSecondary]}
+            tintColor={palette.accent}
             title="Pull to refresh"
-            titleColor="#666"
+            titleColor={palette.textMuted}
           />
         }
       >
@@ -539,7 +543,9 @@ export default function LeavesScreen({ onBack }: LeavesScreenProps) {
         {/* Leave History List */}
         <View style={{ paddingHorizontal: 16 }}>
           {filteredLeaves.length === 0 ? (
-            <Text style={{ textAlign: "center", color: "#666", marginTop: 40 }}>
+            <Text
+              style={{ textAlign: "center", color: palette.textMuted, marginTop: 40 }}
+            >
               No {selectedFilter === 'all' ? '' : selectedFilter + ' '}leave requests found.
             </Text>
           ) : (
@@ -943,23 +949,23 @@ export default function LeavesScreen({ onBack }: LeavesScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: LeavesPalette) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#f3f4f6",
+    backgroundColor: palette.background,
   },
   container: {
     flex: 1,
-    backgroundColor: "#f3f4f6",
+    backgroundColor: palette.background,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     padding: 16,
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
+    borderBottomColor: palette.border,
   },
   backButton: {
     padding: 8,
@@ -967,14 +973,14 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#1a1a1a",
+    color: palette.textPrimary,
   },
-  title: { fontSize: 20, fontWeight: "600" },
-  subtitle: { color: "#666", fontSize: 14 },
-  pinText: { color: "#999", fontSize: 12, marginTop: 2 },
+  title: { fontSize: 20, fontWeight: "600", color: palette.textPrimary },
+  subtitle: { color: palette.textMuted, fontSize: 14 },
+  pinText: { color: palette.textSubtle, fontSize: 12, marginTop: 2 },
 
   requestButton: {
-    backgroundColor: "#00A652",
+    backgroundColor: palette.accent,
     borderRadius: 12,
     padding: 16,
     flexDirection: "row",
@@ -1003,7 +1009,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   statCard: {
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     flex: 1,
     borderRadius: 8,
     padding: 8,
@@ -1017,19 +1023,20 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   statCardActive: {
-    borderColor: "#00A652",
-    backgroundColor: "#f0fdf4",
+    borderColor: palette.accent,
+    backgroundColor: palette.chipActiveBackground,
   },
   iconWrapper: {
     padding: 6,
     borderRadius: 6,
     marginBottom: 4,
+    backgroundColor: palette.chipBackground,
   },
-  statLabel: { color: "#666", fontSize: 10, textAlign: "center" },
-  statValue: { fontSize: 16, fontWeight: "700", marginTop: 2 },
+  statLabel: { color: palette.textMuted, fontSize: 10, textAlign: "center" },
+  statValue: { fontSize: 16, fontWeight: "700", marginTop: 2, color: palette.textPrimary },
 
   leaveCard: {
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     borderRadius: 8,
     padding: 10,
     marginBottom: 8,
@@ -1048,21 +1055,21 @@ const styles = StyleSheet.create({
   compactLeaveType: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#1a1a1a",
+    color: palette.textPrimary,
   },
   compactDayOfWeek: {
     fontSize: 10,
-    color: "#999",
+    color: palette.textSubtle,
     fontWeight: "500",
   },
   compactTime: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#1a1a1a",
+    color: palette.textPrimary,
   },
   timeLabel: {
     fontSize: 9,
-    color: "#999",
+    color: palette.textSubtle,
     fontWeight: "700",
     letterSpacing: 0.5,
   },
@@ -1095,12 +1102,12 @@ const styles = StyleSheet.create({
   },
   reasonLabel: {
     fontSize: 11,
-    color: "#999",
+    color: palette.textSubtle,
     fontWeight: "700",
   },
   reasonCompact: {
     fontSize: 11,
-    color: "#666",
+    color: palette.textMuted,
     lineHeight: 16,
   },
   metaRow: {
@@ -1110,13 +1117,13 @@ const styles = StyleSheet.create({
   },
   metaLabel: {
     fontSize: 11,
-    color: "#9ca3af",
+    color: palette.textSubtle,
     fontWeight: "600",
   },
   metaValue: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#1f2937",
+    color: palette.textPrimary,
   },
 
   errorContainer: {
@@ -1126,7 +1133,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorText: {
-    color: "#dc3545",
+    color: palette.danger,
     fontSize: 16,
     textAlign: "center",
   },
@@ -1135,7 +1142,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#1a1a1a",
+    color: palette.textPrimary,
     marginBottom: 12,
   },
   balanceContainer: {
@@ -1144,7 +1151,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   balanceCard: {
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     borderRadius: 8,
     padding: 12,
     flex: 1,
@@ -1155,23 +1162,23 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     elevation: 2,
     borderLeftWidth: 3,
-    borderLeftColor: "#00A652",
+    borderLeftColor: palette.accent,
   },
   balanceType: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#666",
+    color: palette.textMuted,
     marginBottom: 4,
   },
   balanceAmount: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#00A652",
+    color: palette.accent,
     marginBottom: 4,
   },
   balanceLabel: {
     fontSize: 11,
-    color: "#6b7280",
+    color: palette.textSubtle,
     fontWeight: "600",
   },
   balanceMetaRow: {
@@ -1181,18 +1188,18 @@ const styles = StyleSheet.create({
   },
   balanceMeta: {
     fontSize: 11,
-    color: "#94a3b8",
+    color: palette.textSubtle,
     fontWeight: "600",
   },
 
   // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: palette.overlay,
     justifyContent: "flex-end",
   },
   modalContent: {
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
@@ -1207,22 +1214,23 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 20,
     textAlign: "center",
+    color: palette.textPrimary,
   },
   inputLabel: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#333",
+    color: palette.textPrimary,
     marginBottom: 8,
     marginTop: 12,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: palette.inputBorder,
     borderRadius: 8,
     padding: 12,
     fontSize: 14,
-    backgroundColor: "#f9f9f9",
-    color: "#333",
+    backgroundColor: palette.inputBackground,
+    color: palette.textPrimary,
   },
   textArea: {
     height: 100,
@@ -1236,27 +1244,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: "#f3f4f6",
+    backgroundColor: palette.chipBackground,
     marginRight: 8,
     borderWidth: 2,
     borderColor: "transparent",
     alignItems: "center",
   },
   leaveTypeChipActive: {
-    backgroundColor: "#d1fae5",
-    borderColor: "#00A652",
+    backgroundColor: palette.chipActiveBackground,
+    borderColor: palette.chipActiveBorder,
   },
   leaveTypeChipText: {
     fontSize: 13,
-    color: "#666",
+    color: palette.textMuted,
     fontWeight: "600",
   },
   leaveTypeChipTextActive: {
-    color: "#00A652",
+    color: palette.chipActiveText,
   },
   leaveTypeQuota: {
     fontSize: 10,
-    color: "#999",
+    color: palette.textSubtle,
     marginTop: 2,
   },
   modalButtons: {
@@ -1268,19 +1276,19 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 14,
     borderRadius: 8,
-    backgroundColor: "#f3f4f6",
+    backgroundColor: palette.chipBackground,
     alignItems: "center",
   },
   cancelButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#666",
+    color: palette.textMuted,
   },
   submitButton: {
     flex: 1,
     padding: 14,
     borderRadius: 8,
-    backgroundColor: "#00A652",
+    backgroundColor: palette.accent,
     alignItems: "center",
   },
   submitButtonDisabled: {
@@ -1298,10 +1306,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     borderWidth: 2,
-    borderColor: "#e5e7eb",
+    borderColor: palette.border,
     borderRadius: 10,
     padding: 14,
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     marginBottom: 12,
     shadowColor: "#000",
     shadowOpacity: 0.03,
@@ -1311,20 +1319,20 @@ const styles = StyleSheet.create({
   },
   datePickerText: {
     fontSize: 15,
-    color: "#1a1a1a",
+    color: palette.textPrimary,
     fontWeight: "600",
   },
   datePickerPlaceholder: {
     fontSize: 15,
-    color: "#9ca3af",
+    color: palette.textSubtle,
   },
   dateRangeArrow: {
     fontSize: 14,
-    color: "#00A652",
+    color: palette.accent,
     fontWeight: "700",
   },
   daysCountBadge: {
-    backgroundColor: "#e6f7ed",
+    backgroundColor: palette.chipActiveBackground,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
@@ -1332,7 +1340,7 @@ const styles = StyleSheet.create({
   daysCountText: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#00A652",
+    color: palette.accent,
   },
   clearDatesButton: {
     flexDirection: "row",
@@ -1372,12 +1380,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: palette.overlay,
   },
   
   // Date Picker Inline Container (centered card)
   datePickerInlineContainer: {
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     borderRadius: 16,
     shadowColor: "#000",
     shadowOpacity: 0.4,
@@ -1393,21 +1401,21 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e5e5",
+    borderBottomColor: palette.border,
   },
   datePickerTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#1a1a1a",
+    color: palette.textPrimary,
     marginBottom: 2,
   },
   datePickerSubtitle: {
     fontSize: 12,
-    color: "#666",
+    color: palette.textMuted,
   },
   clearButtonInCalendar: {
     padding: 6,
@@ -1419,7 +1427,7 @@ const styles = StyleSheet.create({
   doneButtonContainer: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: "#00A652",
+    backgroundColor: palette.accent,
     borderRadius: 8,
   },
   iosPickerDoneButton: {
@@ -1428,9 +1436,31 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   datePickerWrapper: {
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     paddingHorizontal: 5,
     paddingVertical: 10,
   },
+});
+
+type LeavesPalette = ReturnType<typeof buildLeavesPalette>;
+
+const buildLeavesPalette = (isDarkMode: boolean) => ({
+  background: isDarkMode ? "#000000" : "#f3f4f6",
+  card: isDarkMode ? "#0d0d0d" : "#fff",
+  border: isDarkMode ? "#1a1a1a" : "#ddd",
+  textPrimary: isDarkMode ? "#f8fafc" : "#1a1a1a",
+  textMuted: isDarkMode ? "#a1a1aa" : "#666",
+  textSubtle: isDarkMode ? "#94a3b8" : "#999",
+  accent: "#00A652",
+  accentSecondary: "#3b82f6",
+  inputBorder: isDarkMode ? "#1f1f1f" : "#ddd",
+  inputBackground: isDarkMode ? "#080808" : "#f9f9f9",
+  chipBackground: isDarkMode ? "#111111" : "#f3f4f6",
+  chipActiveBackground: isDarkMode ? "rgba(16,185,129,0.25)" : "#d1fae5",
+  chipActiveBorder: "#00A652",
+  chipActiveText: "#00A652",
+  warning: "#f97316",
+  danger: "#dc3545",
+  overlay: "rgba(0,0,0,0.5)",
 });
 

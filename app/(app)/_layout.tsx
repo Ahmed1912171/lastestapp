@@ -2,10 +2,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { Dimensions, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler"; // ✅ Added
+import { useTheme } from "../../ctx/theme";
 
 export default function AppLayout() {
   const { width } = Dimensions.get("window");
   const isTablet = width >= 800; // 👈 Detect tablet screens
+  const { isDarkMode } = useTheme();
+  const tabBackground = isDarkMode ? "#000000" : "#fff";
+  const activeTint = isDarkMode ? "#ffffff" : "#00A652";
+  const inactiveTint = isDarkMode ? "#9ca3af" : "#8e8e93";
+  const borderColor = isDarkMode ? "#1a1a1a" : "#e5e7eb";
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -14,10 +20,10 @@ export default function AppLayout() {
         screenOptions={{
           headerShown: false,
           tabBarShowLabel: false,
-          tabBarActiveTintColor: "#00A652",
-          tabBarInactiveTintColor: "#8e8e93",
+          tabBarActiveTintColor: activeTint,
+          tabBarInactiveTintColor: inactiveTint,
           tabBarStyle: {
-            backgroundColor: "#fff",
+            backgroundColor: tabBackground,
 
             // ✅ Height and padding
             height: isTablet
@@ -32,9 +38,10 @@ export default function AppLayout() {
 
             // ✅ Border and shadows
             borderTopWidth: 0,
+            borderTopColor: tabBackground,
             elevation: isTablet ? 14 : 0,
-            shadowColor: "#000",
-            shadowOpacity: isTablet ? 0.15 : 0.08,
+            shadowColor: isDarkMode ? "#000" : "#000",
+            shadowOpacity: isTablet ? 0.2 : 0.08,
             shadowRadius: isTablet ? 10 : 5,
             shadowOffset: { width: 0, height: 6 },
 

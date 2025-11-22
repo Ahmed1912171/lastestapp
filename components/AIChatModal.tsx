@@ -1,5 +1,5 @@
 import axios from "axios";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
@@ -14,6 +14,7 @@ import {
     TouchableWithoutFeedback,
     View,
 } from "react-native";
+import { useTheme } from "../ctx/theme";
 
 interface Message {
   id: string;
@@ -27,13 +28,17 @@ interface Props {
   patientId?: number | null;
 }
 
-const BACKEND_BASE = "http://192.168.101.25:3000";
+const BACKEND_BASE = "http://192.168.100.103:3000";
+
+type ThemePalette = ReturnType<typeof useTheme>["palette"];
 
 const AIChatModal: React.FC<Props> = ({ visible, onClose, patientId }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const { isDarkMode, palette } = useTheme();
+  const styles = useMemo(() => createStyles(palette, isDarkMode), [palette, isDarkMode]);
 
   // ⚡ Fetch patient analysis only when modal opens (with a valid patientId)
   useEffect(() => {
@@ -205,7 +210,7 @@ ${analysisText}
                 onPress={sendMessage}
                 disabled={loading}
               >
-                <Text style={{ color: "white", fontWeight: "bold" }}>Send</Text>
+                <Text style={styles.sendButtonText}>Send</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -215,83 +220,92 @@ ${analysisText}
   );
 };
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  keyboardView: {
-    width: "90%",
-    height: "70%",
-  },
-  modal: {
-    flex: 1,
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    overflow: "hidden",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    backgroundColor: "#00A652",
-    padding: 15,
-  },
-  headerText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  close: {
-    color: "#fff",
-    fontSize: 18,
-  },
-  chatList: {
-    flex: 1,
-    paddingHorizontal: 10,
-  },
-  messageContainer: {
-    marginVertical: 5,
-    padding: 10,
-    borderRadius: 12,
-    maxWidth: "80%",
-  },
-  userBubble: {
-    backgroundColor: "#00A652",
-    alignSelf: "flex-end",
-    borderTopRightRadius: 0,
-  },
-  gptBubble: {
-    backgroundColor: "#e5e5ea",
-    alignSelf: "flex-start",
-    borderTopLeftRadius: 0,
-  },
-  userText: { color: "white", fontSize: 15 },
-  gptText: { color: "black", fontSize: 15, lineHeight: 20 },
-  inputContainer: {
-    flexDirection: "row",
-    padding: 10,
-    borderTopWidth: 1,
-    borderColor: "#ddd",
-    backgroundColor: "#fafafa",
-  },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    marginRight: 10,
-    maxHeight: 100,
-  },
-  sendButton: {
-    backgroundColor: "#00A652",
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    justifyContent: "center",
-  },
-});
+const createStyles = (palette: ThemePalette, isDarkMode: boolean) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: isDarkMode ? "rgba(0,0,0,0.85)" : "rgba(0,0,0,0.4)",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    keyboardView: {
+      width: "90%",
+      height: "70%",
+    },
+    modal: {
+      flex: 1,
+      backgroundColor: palette.card ?? "#fff",
+      borderRadius: 20,
+      overflow: "hidden",
+      borderWidth: 1,
+      borderColor: palette.border ?? "#e5e7eb",
+    },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      backgroundColor: palette.primary ?? "#00A652",
+      padding: 15,
+    },
+    headerText: {
+      color: "#fff",
+      fontWeight: "bold",
+      fontSize: 16,
+    },
+    close: {
+      color: "#fff",
+      fontSize: 18,
+    },
+    chatList: {
+      flex: 1,
+      paddingHorizontal: 10,
+    },
+    messageContainer: {
+      marginVertical: 5,
+      padding: 10,
+      borderRadius: 12,
+      maxWidth: "80%",
+    },
+    userBubble: {
+      backgroundColor: palette.primary ?? "#00A652",
+      alignSelf: "flex-end",
+      borderTopRightRadius: 0,
+    },
+    gptBubble: {
+      backgroundColor: palette.surface ?? (isDarkMode ? "#111111" : "#e5e5ea"),
+      alignSelf: "flex-start",
+      borderTopLeftRadius: 0,
+    },
+    userText: { color: "#fff", fontSize: 15 },
+    gptText: {
+      color: palette.text ?? "#111",
+      fontSize: 15,
+      lineHeight: 20,
+    },
+    inputContainer: {
+      flexDirection: "row",
+      padding: 10,
+      borderTopWidth: 1,
+      borderColor: palette.border ?? "#ddd",
+      backgroundColor: palette.surface ?? "#fafafa",
+    },
+    input: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: palette.border ?? "#ccc",
+      borderRadius: 20,
+      paddingHorizontal: 15,
+      paddingVertical: 10,
+      marginRight: 10,
+      maxHeight: 100,
+      color: palette.text ?? "#111",
+    },
+    sendButton: {
+      backgroundColor: palette.primary ?? "#00A652",
+      borderRadius: 20,
+      paddingHorizontal: 20,
+      justifyContent: "center",
+    },
+    sendButtonText: { color: "#fff", fontWeight: "bold" },
+  });
 
 export default AIChatModal;

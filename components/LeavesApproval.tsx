@@ -24,6 +24,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSession } from "../ctx";
+import { useTheme } from "../ctx/theme";
 
 type PendingLeave = {
   id: number;
@@ -46,12 +47,15 @@ type LeavesApprovalProps = {
 
 export default function LeavesApproval({ onBack }: LeavesApprovalProps) {
   const { session } = useSession();
+  const { isDarkMode } = useTheme();
+  const palette = useMemo(() => buildApprovalPalette(isDarkMode), [isDarkMode]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const [requests, setRequests] = useState<PendingLeave[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [actionId, setActionId] = useState<number | null>(null);
 
-  const LOCAL_IP = "192.168.101.25";
+  const LOCAL_IP = "192.168.100.103";
   const API_BASE =
     Platform.OS === "android" ? "http://10.0.2.2:3000" : `http://${LOCAL_IP}:3000`;
 
@@ -170,11 +174,11 @@ export default function LeavesApproval({ onBack }: LeavesApprovalProps) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
       {onBack ? (
         <View style={styles.header}>
           <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <ArrowLeft size={24} color="#333" />
+            <ArrowLeft size={24} color={palette.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Leaves Approval</Text>
           <View style={{ width: 40 }} />
@@ -186,14 +190,14 @@ export default function LeavesApproval({ onBack }: LeavesApprovalProps) {
       )}
 
       <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        style={styles.scrollArea}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={["#00A652", "#3b82f6"]}
-            tintColor="#00A652"
+            colors={[palette.accent, palette.accentSecondary]}
+            tintColor={palette.accent}
           />
         }
       >
@@ -210,26 +214,26 @@ export default function LeavesApproval({ onBack }: LeavesApprovalProps) {
 
         {loading ? (
           <View style={styles.loader}>
-            <ActivityIndicator size="large" color="#00A652" />
-            <Text style={{ color: "#666", marginTop: 12 }}>Loading pending leaves...</Text>
+            <ActivityIndicator size="large" color={palette.accent} />
+            <Text style={styles.loaderText}>Loading pending leaves...</Text>
           </View>
         ) : requests.length === 0 ? (
           <View style={styles.emptyState}>
-            <ClipboardList size={40} color="#9ca3af" />
+            <ClipboardList size={40} color={palette.textSubtle} />
             <Text style={styles.emptyTitle}>No pending approvals</Text>
             <Text style={styles.emptySubtitle}>
               You're all caught up! New leave requests will appear here.
             </Text>
           </View>
         ) : (
-          <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
+          <View style={styles.listContainer}>
             {requests.map((request) => (
               <View key={request.id} style={styles.leaveCard}>
                 <View style={styles.leaveCardHeader}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.leaveTypeText}>{request.leaveType || "Leave Type"}</Text>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 }}>
-                      <User size={14} color="#6b7280" />
+                      <User size={14} color={palette.textMuted} />
                       <Text style={styles.employeeText}>
                         {request.employeeName || `PIN ${request.pinNumber}`}
                       </Text>
@@ -247,14 +251,14 @@ export default function LeavesApproval({ onBack }: LeavesApprovalProps) {
 
                 <View style={styles.dateRow}>
                   <View style={styles.dateItem}>
-                    <CalendarIcon size={16} color="#00A652" />
+                    <CalendarIcon size={16} color={palette.accent} />
                     <View style={{ marginLeft: 8 }}>
                       <Text style={styles.dateLabel}>Start</Text>
                       <Text style={styles.dateValue}>{formatDate(request.startDate)}</Text>
                     </View>
                   </View>
                   <View style={styles.dateItem}>
-                    <CalendarIcon size={16} color="#3b82f6" />
+                    <CalendarIcon size={16} color={palette.accentSecondary} />
                     <View style={{ marginLeft: 8 }}>
                       <Text style={styles.dateLabel}>End</Text>
                       <Text style={styles.dateValue}>{formatDate(request.endDate)}</Text>
@@ -268,7 +272,7 @@ export default function LeavesApproval({ onBack }: LeavesApprovalProps) {
                     <Text style={styles.metaValue}>{request.daysRequested} days</Text>
                   </View>
                   <View style={styles.metaItem}>
-                    <FileText size={16} color="#6b7280" />
+                    <FileText size={16} color={palette.textMuted} />
                     <Text style={styles.metaValue}>
                       Requested {formatDate(request.requestDate)}
                     </Text>
@@ -340,219 +344,256 @@ export default function LeavesApproval({ onBack }: LeavesApprovalProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#f3f4f6",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 16,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#1a1a1a",
-  },
-  statsContainer: {
-    flexDirection: "row",
-    paddingHorizontal: 12,
-    paddingTop: 16,
-    gap: 8,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: "#fff",
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-  },
-  statLabel: {
-    fontSize: 11,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-    color: "#6b7280",
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginTop: 4,
-    color: "#111",
-  },
-  loader: {
-    marginTop: 40,
-    alignItems: "center",
-  },
-  emptyState: {
-    marginTop: 60,
-    alignItems: "center",
-    paddingHorizontal: 24,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#1f2937",
-    marginTop: 16,
-  },
-  emptySubtitle: {
-    color: "#6b7280",
-    textAlign: "center",
-    marginTop: 8,
-    lineHeight: 20,
-  },
-  leaveCard: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: "#00A652",
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
-  },
-  leaveCardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  leaveTypeText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#1f2937",
-  },
-  employeeText: {
-    marginTop: 2,
-    fontSize: 12,
-    color: "#4b5563",
-  },
-  statusBadge: {
-    backgroundColor: "#fef3c7",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-  },
-  statusText: {
-    color: "#b45309",
-    fontWeight: "600",
-    fontSize: 11,
-  },
-  dateRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 10,
-    gap: 12,
-  },
-  dateItem: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 9,
-    backgroundColor: "#f9fafb",
-    borderRadius: 10,
-  },
-  dateLabel: {
-    fontSize: 10,
-    textTransform: "uppercase",
-    color: "#9ca3af",
-    letterSpacing: 0.5,
-  },
-  dateValue: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#111827",
-  },
-  metaRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  metaItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  metaValue: {
-    fontSize: 12,
-    color: "#4b5563",
-    fontWeight: "600",
-  },
-  reasonBox: {
-    backgroundColor: "#f9fafb",
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 12,
-  },
-  reasonLabel: {
-    fontSize: 12,
-    color: "#9ca3af",
-    textTransform: "uppercase",
-    marginBottom: 4,
-  },
-  reasonText: {
-    fontSize: 14,
-    color: "#1f2937",
-    lineHeight: 20,
-  },
-  actionsRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 12,
-    borderRadius: 10,
-  },
-  rejectButton: {
-    backgroundColor: "#ef4444",
-  },
-  approveButton: {
-    backgroundColor: "#10b981",
-  },
-  actionText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  managerBadge: {
-    backgroundColor: "#fef3c7",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-  },
-  managerBadgeText: {
-    color: "#b45309",
-    fontWeight: "600",
-    fontSize: 10,
-  },
-  restrictedMessage: {
-    backgroundColor: "#fee2e2",
-    borderRadius: 10,
-    padding: 12,
-    marginTop: 8,
-  },
-  restrictedText: {
-    color: "#991b1b",
-    fontSize: 13,
-    fontWeight: "600",
-    textAlign: "center",
-  },
+const createStyles = (palette: ApprovalPalette) =>
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: palette.background,
+    },
+    scrollArea: {
+      flex: 1,
+      backgroundColor: palette.background,
+    },
+    scrollContent: {
+      paddingBottom: 32,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: 16,
+      backgroundColor: palette.card,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+    },
+    backButton: {
+      padding: 8,
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: "600",
+      color: palette.textPrimary,
+    },
+    statsContainer: {
+      flexDirection: "row",
+      paddingHorizontal: 12,
+      paddingTop: 16,
+      gap: 8,
+    },
+    statCard: {
+      flex: 1,
+      backgroundColor: palette.card,
+      padding: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: palette.border,
+      shadowColor: "#000",
+      shadowOpacity: 0.04,
+      shadowRadius: 4,
+      shadowOffset: { width: 0, height: 1 },
+    },
+    statLabel: {
+      fontSize: 11,
+      textTransform: "uppercase",
+      letterSpacing: 0.4,
+      color: palette.textMuted,
+    },
+    statValue: {
+      fontSize: 18,
+      fontWeight: "700",
+      marginTop: 4,
+      color: palette.textPrimary,
+    },
+    loader: {
+      marginTop: 40,
+      alignItems: "center",
+    },
+    loaderText: {
+      color: palette.textMuted,
+      marginTop: 12,
+    },
+    emptyState: {
+      marginTop: 60,
+      alignItems: "center",
+      paddingHorizontal: 24,
+    },
+    emptyTitle: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: palette.textPrimary,
+      marginTop: 16,
+    },
+    emptySubtitle: {
+      color: palette.textMuted,
+      textAlign: "center",
+      marginTop: 8,
+      lineHeight: 20,
+    },
+    listContainer: {
+      paddingHorizontal: 16,
+      marginTop: 8,
+    },
+    leaveCard: {
+      backgroundColor: palette.card,
+      borderRadius: 10,
+      padding: 14,
+      marginBottom: 12,
+      borderLeftWidth: 3,
+      borderLeftColor: palette.accent,
+      shadowColor: "#000",
+      shadowOpacity: 0.04,
+      shadowRadius: 3,
+      shadowOffset: { width: 0, height: 1 },
+    },
+    leaveCardHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 10,
+    },
+    leaveTypeText: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: palette.textPrimary,
+    },
+    employeeText: {
+      marginTop: 2,
+      fontSize: 12,
+      color: palette.textMuted,
+    },
+    statusBadge: {
+      backgroundColor: palette.warnBackground,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 999,
+    },
+    statusText: {
+      color: palette.warnText,
+      fontWeight: "600",
+      fontSize: 11,
+    },
+    dateRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 10,
+      gap: 12,
+    },
+    dateItem: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      padding: 9,
+      backgroundColor: palette.surface,
+      borderRadius: 10,
+    },
+    dateLabel: {
+      fontSize: 10,
+      textTransform: "uppercase",
+      color: palette.textSubtle,
+      letterSpacing: 0.5,
+    },
+    dateValue: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: palette.textPrimary,
+    },
+    metaRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 12,
+    },
+    metaItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    metaValue: {
+      fontSize: 12,
+      color: palette.textPrimary,
+      fontWeight: "600",
+    },
+    reasonBox: {
+      backgroundColor: palette.surface,
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 12,
+    },
+    reasonLabel: {
+      fontSize: 12,
+      color: palette.textSubtle,
+      textTransform: "uppercase",
+      marginBottom: 4,
+    },
+    reasonText: {
+      fontSize: 14,
+      color: palette.textPrimary,
+      lineHeight: 20,
+    },
+    actionsRow: {
+      flexDirection: "row",
+      gap: 12,
+    },
+    actionButton: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      paddingVertical: 12,
+      borderRadius: 10,
+    },
+    rejectButton: {
+      backgroundColor: palette.danger,
+    },
+    approveButton: {
+      backgroundColor: palette.success,
+    },
+    actionText: {
+      color: "#fff",
+      fontWeight: "600",
+    },
+    managerBadge: {
+      backgroundColor: palette.managerBadgeBg,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 999,
+    },
+    managerBadgeText: {
+      color: palette.warnText,
+      fontWeight: "600",
+      fontSize: 10,
+    },
+    restrictedMessage: {
+      backgroundColor: palette.restrictedBg,
+      borderRadius: 10,
+      padding: 12,
+      marginTop: 8,
+    },
+    restrictedText: {
+      color: palette.restrictedText,
+      fontSize: 13,
+      fontWeight: "600",
+      textAlign: "center",
+    },
+  });
+
+type ApprovalPalette = ReturnType<typeof buildApprovalPalette>;
+
+const buildApprovalPalette = (isDarkMode: boolean) => ({
+  background: isDarkMode ? "#000000" : "#f3f4f6",
+  card: isDarkMode ? "#0d0d0d" : "#fff",
+  surface: isDarkMode ? "#080808" : "#f9fafb",
+  border: isDarkMode ? "#1a1a1a" : "#e5e7eb",
+  textPrimary: isDarkMode ? "#f8fafc" : "#1f2937",
+  textMuted: isDarkMode ? "#a1a1aa" : "#6b7280",
+  textSubtle: isDarkMode ? "#94a3b8" : "#9ca3af",
+  accent: "#00A652",
+  accentSecondary: "#3b82f6",
+  success: "#10b981",
+  danger: "#ef4444",
+  warnBackground: isDarkMode ? "rgba(251, 191, 36, 0.15)" : "#fef3c7",
+  warnText: "#b45309",
+  managerBadgeBg: isDarkMode ? "rgba(251,191,36,0.2)" : "#fef3c7",
+  restrictedBg: isDarkMode ? "rgba(254,226,226,0.18)" : "#fee2e2",
+  restrictedText: isDarkMode ? "#fecaca" : "#991b1b",
 });

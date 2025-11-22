@@ -1,7 +1,7 @@
 import axios from "axios";
 import { useRouter } from "expo-router";
 import { Search } from "lucide-react-native";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
@@ -13,6 +13,7 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTheme } from "../../ctx/theme";
 
 // ✅ Patient type
 type Patient = {
@@ -30,6 +31,11 @@ export default function SearchScreen() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [page, setPage] = useState<number>(1);
+  const { isDarkMode } = useTheme();
+  const styles = useMemo(() => createStyles(isDarkMode), [isDarkMode]);
+  const textColor = isDarkMode ? "#f8fafc" : "#111827";
+  const mutedColor = isDarkMode ? "#94a3b8" : "#666";
+  const placeholderColor = isDarkMode ? "#94a3b8" : "#888";
 
   // 🔹 Fetch results from backend
   const fetchResults = useCallback(
@@ -41,7 +47,7 @@ export default function SearchScreen() {
       setLoading(true);
       try {
         const res = await axios.get<Patient[]>(
-          "http://192.168.101.25:3000/search",
+          "http://192.168.100.103:3000/search",
           { params: { query, page: pageNumber, limit: 50 } }
         );
 
@@ -104,11 +110,15 @@ export default function SearchScreen() {
             style={styles.avatarImage}
           />
           <View style={{ marginLeft: 8 }}>
-            <Text style={styles.patientName}>
+            <Text style={[styles.patientName, { color: textColor }]}>
               {item.PATIENT_FNAME} {item.PATIENT_LNAME || ""}
             </Text>
-            <Text style={styles.patientMR}>MR#: {item.PMR_NO || "-"}</Text>
-            <Text style={styles.patientMR}>ID: {item.PATIENT_ID}</Text>
+            <Text style={[styles.patientMR, { color: mutedColor }]}>
+              MR#: {item.PMR_NO || "-"}
+            </Text>
+            <Text style={[styles.patientMR, { color: mutedColor }]}>
+              ID: {item.PATIENT_ID}
+            </Text>
           </View>
         </View>
         <View>
@@ -130,10 +140,10 @@ export default function SearchScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Search Patients</Text>
         <View style={styles.searchContainer}>
-          <Search size={16} color="#454242ff" />
+          <Search size={16} color={mutedColor} />
           <TextInput
             placeholder="Search by name, MR, ID"
-            placeholderTextColor="#888"
+            placeholderTextColor={placeholderColor}
             value={searchQuery}
             onChangeText={handleSearch}
             style={styles.searchInput}
@@ -144,7 +154,7 @@ export default function SearchScreen() {
       {loading && (
         <ActivityIndicator
           size="large"
-          color="#0000ff"
+          color={isDarkMode ? "#38bdf8" : "#0000ff"}
           style={{ marginTop: 10 }}
         />
       )}
@@ -160,7 +170,9 @@ export default function SearchScreen() {
         contentContainerStyle={{ paddingBottom: 100 }}
         ListEmptyComponent={
           !loading ? (
-            <Text style={styles.noResults}>No results found</Text>
+            <Text style={[styles.noResults, { color: mutedColor }]}>
+              No results found
+            </Text>
           ) : null
         }
       />
@@ -168,46 +180,72 @@ export default function SearchScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f3f4f6" },
-  header: { padding: 16, borderBottomWidth: 1, borderBottomColor: "#ddd" },
-  title: { fontSize: 22, fontWeight: "700", marginBottom: 8 },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    paddingHorizontal: 8,
-  },
-  searchInput: { flex: 1, paddingVertical: 6, paddingHorizontal: 8 },
+const createStyles = (isDarkMode: boolean) => {
+  const background = isDarkMode ? "#000000" : "#f3f4f6";
+  const card = isDarkMode ? "#0d0d0d" : "#fff";
+  const border = isDarkMode ? "#1a1a1a" : "#ddd";
+  const inputBg = isDarkMode ? "#080808" : "#fff";
+  const inputText = isDarkMode ? "#f8fafc" : "#111";
 
-  card: {
-    backgroundColor: "#fff",
-    margin: 8,
-    borderRadius: 10,
-    padding: 12,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  avatarImage: { width: 40, height: 40, borderRadius: 20 },
-  patientName: { fontWeight: "600" },
-  patientMR: { color: "#666", fontSize: 12 },
-  statusBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    fontSize: 10,
-    textAlign: "center",
-  },
-  stable: { backgroundColor: "#bbf7d0", color: "#00A652" },
-  critical: { backgroundColor: "#fecaca", color: "#991b1b" },
-  noResults: {
-    textAlign: "center",
-    marginTop: 20,
-    fontSize: 16,
-    color: "#999",
-  },
-});
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: background },
+    header: {
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: border,
+      backgroundColor: background,
+    },
+    title: {
+      fontSize: 22,
+      fontWeight: "700",
+      marginBottom: 8,
+      color: isDarkMode ? "#f8fafc" : "#111",
+    },
+    searchContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: inputBg,
+      borderRadius: 8,
+      paddingHorizontal: 8,
+      borderWidth: 1,
+      borderColor: border,
+    },
+    searchInput: {
+      flex: 1,
+      paddingVertical: 6,
+      paddingHorizontal: 8,
+      color: inputText,
+    },
+
+    card: {
+      backgroundColor: card,
+      margin: 8,
+      borderRadius: 10,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: border,
+    },
+    cardHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    avatarImage: { width: 40, height: 40, borderRadius: 20 },
+    patientName: { fontWeight: "600" },
+    patientMR: { fontSize: 12 },
+    statusBadge: {
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 6,
+      fontSize: 10,
+      textAlign: "center",
+    },
+    stable: { backgroundColor: "#bbf7d0", color: "#00A652" },
+    critical: { backgroundColor: "#fecaca", color: "#991b1b" },
+    noResults: {
+      textAlign: "center",
+      marginTop: 20,
+      fontSize: 16,
+    },
+  });
+};

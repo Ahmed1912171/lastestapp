@@ -1,5 +1,5 @@
 import axios from "axios";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -14,6 +14,7 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context"; // ✅ CORRECT
+import { useTheme } from "../ctx/theme";
 import AddMedicine from "./Addmedicine";
 
 let WebView: any;
@@ -27,15 +28,27 @@ interface PharmacyTableProps {
   patientId: string | number;
 }
 
+type ThemePalette = ReturnType<typeof useTheme>["palette"];
+
 const PharmacyTable: React.FC<PharmacyTableProps> = ({ patientId }) => {
   const [htmlContent, setHtmlContent] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const { isDarkMode, palette } = useTheme();
+  const styles = useMemo(() => createStyles(palette, isDarkMode), [palette, isDarkMode]);
+  const htmlTheme = useMemo(
+    () => ({
+      background: isDarkMode ? "#000000" : "#ffffff",
+      text: isDarkMode ? "#f8fafc" : "#222222",
+      header: palette.primary ?? "#00A652",
+    }),
+    [isDarkMode, palette]
+  );
 
   const fetchData = useCallback(async () => {
     try {
       const { data } = await axios.get(
-        `http://192.168.101.25:3000/tr_pharmacy_store_request?patientId=${patientId}`
+        `http://192.168.100.103:3000/tr_pharmacy_store_request?patientId=${patientId}`
       );
 
       const activeMeds = (data || []).filter(
@@ -92,11 +105,11 @@ const PharmacyTable: React.FC<PharmacyTableProps> = ({ patientId }) => {
           <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@14.3.0/dist/handsontable.min.css">
           <script src="https://cdn.jsdelivr.net/npm/handsontable@14.3.0/dist/handsontable.min.js"></script>
           <style>
-            html, body { margin:0; padding:0; background:#fff; font-family:Arial,sans-serif; overflow-x:hidden; width:100%; height:100%; }
+            html, body { margin:0; padding:0; background:${htmlTheme.background}; color:${htmlTheme.text}; font-family:Arial,sans-serif; overflow-x:hidden; width:100%; height:100%; }
             .section-title { font-size:18px; font-weight:bold; margin:10px 0 8px 0; text-align:center; }
             #active, #stopped { width:100%; min-height:250px; margin-bottom:20px; }
-            .handsontable th { background-color:#00A652 !important; color:#fff !important; font-weight:bold !important; text-align:center; white-space:nowrap; }
-            .handsontable td { text-align:center; font-size:13px; color:#222 !important; white-space:normal !important; word-wrap:break-word; padding:4px 6px !important; }
+            .handsontable th { background-color:${htmlTheme.header} !important; color:#fff !important; font-weight:bold !important; text-align:center; white-space:nowrap; }
+            .handsontable td { text-align:center; font-size:13px; color:${htmlTheme.text} !important; white-space:normal !important; word-wrap:break-word; padding:4px 6px !important; }
             .table-wrapper { width:100%; overflow-x:auto; padding:5px; box-sizing:border-box; }
             .handsontable { width:100% !important; }
             @media (max-width: 768px) { .handsontable th, .handsontable td { font-size:11px !important; padding:2px 4px !important; } .section-title { font-size:16px; } }
@@ -105,7 +118,7 @@ const PharmacyTable: React.FC<PharmacyTableProps> = ({ patientId }) => {
         <body>
           <div class="section-title">Active Medications</div>
           <div class="table-wrapper"><div id="active"></div></div>
-          <div class="section-title" style="color:red;">Stopped Medications</div>
+          <div class="section-title" style="color:#ef4444;">Stopped Medications</div>
           <div class="table-wrapper"><div id="stopped"></div></div>
 
           <script>
@@ -172,7 +185,7 @@ const PharmacyTable: React.FC<PharmacyTableProps> = ({ patientId }) => {
         </div>
       `);
     }
-  }, [patientId]);
+  }, [patientId, htmlTheme]);
 
   useEffect(() => {
     fetchData();
@@ -187,23 +200,23 @@ const PharmacyTable: React.FC<PharmacyTableProps> = ({ patientId }) => {
   if (!htmlContent) {
     return (
       <SafeAreaView style={styles.center}>
-        <ActivityIndicator size="large" color="#00A652" />
+        <ActivityIndicator size="large" color={palette.primary ?? "#00A652"} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+    <SafeAreaView style={styles.safeArea}>
       <View style={{ flex: 1 }}>
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={styles.scrollContent}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              colors={["#00A652"]}
-              tintColor="#00A652"
-              progressBackgroundColor="#fff"
+              colors={[palette.primary ?? "#00A652"]}
+              tintColor={palette.primary ?? "#00A652"}
+              progressBackgroundColor={palette.card ?? "#fff"}
             />
           }
         >
@@ -227,7 +240,7 @@ const PharmacyTable: React.FC<PharmacyTableProps> = ({ patientId }) => {
                 renderLoading={() => (
                   <ActivityIndicator
                     size="large"
-                    color="#00A652"
+                    color={palette.primary ?? "#00A652"}
                     style={{ marginTop: 20 }}
                   />
                 )}
@@ -261,7 +274,7 @@ const PharmacyTable: React.FC<PharmacyTableProps> = ({ patientId }) => {
               onPress={() => setModalVisible(false)}
               style={styles.closeButton}
             >
-              <Text style={{ fontSize: 20, color: "#999" }}>✕</Text>
+              <Text style={styles.closeText}>✕</Text>
             </TouchableOpacity>
             <AddMedicine
               patientId={patientId}
@@ -274,57 +287,63 @@ const PharmacyTable: React.FC<PharmacyTableProps> = ({ patientId }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  addButton: {
-    backgroundColor: "#00A652",
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  addButtonText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "bold",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  fixedButtonContainer: {
-    position: "absolute",
-    bottom: 20,
-    left: 20,
-    right: 20,
-    alignItems: "center",
-    zIndex: 100,
-  },
-  modalBackground: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    width: "90%",
-    height: "80%",
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 15,
-    position: "relative",
-  },
-  closeButton: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    zIndex: 999,
-    padding: 6,
-  },
-});
+const createStyles = (palette: ThemePalette, isDarkMode: boolean) =>
+  StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: palette.background ?? "#fff" },
+    scrollContent: { flexGrow: 1 },
+    center: { flex: 1, justifyContent: "center", alignItems: "center" },
+    addButton: {
+      backgroundColor: palette.primary ?? "#00A652",
+      paddingVertical: 14,
+      paddingHorizontal: 14,
+      borderRadius: 10,
+      alignItems: "center",
+      justifyContent: "center",
+      elevation: 5,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+    },
+    addButtonText: {
+      color: "#fff",
+      fontSize: 12,
+      fontWeight: "bold",
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+    },
+    fixedButtonContainer: {
+      position: "absolute",
+      bottom: 20,
+      left: 20,
+      right: 20,
+      alignItems: "center",
+      zIndex: 100,
+    },
+    modalBackground: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.6)",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    modalContent: {
+      width: "90%",
+      height: "80%",
+      backgroundColor: palette.card ?? "#fff",
+      borderRadius: 10,
+      padding: 15,
+      position: "relative",
+      borderWidth: 1,
+      borderColor: palette.border ?? "#e5e7eb",
+    },
+    closeButton: {
+      position: "absolute",
+      top: 10,
+      right: 10,
+      zIndex: 999,
+      padding: 6,
+    },
+    closeText: { fontSize: 20, color: palette.mutedText ?? "#999" },
+  });
 
 export default PharmacyTable;

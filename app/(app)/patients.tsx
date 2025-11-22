@@ -9,6 +9,7 @@ import React, {
     ReactNode,
     useCallback,
     useEffect,
+    useMemo,
     useRef,
     useState,
 } from "react";
@@ -31,6 +32,7 @@ import DropDownPicker from "react-native-dropdown-picker";
 import Modal from "react-native-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
+import { useTheme } from "../../ctx/theme";
 
 import Results from "@/components/Results";
 import {
@@ -110,6 +112,7 @@ const TABS = [
 type TabType = (typeof TABS)[number];
 
 export default function PatientsScreen() {
+  const { isDarkMode } = useTheme();
   // ---------- data + UI state ----------
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(false); // initial page loader
@@ -129,9 +132,15 @@ export default function PatientsScreen() {
   const [messageText, setMessageText] = useState("");
   const [aiModalVisible, setAiModalVisible] = useState(false);
   const [aiPatientId, setAiPatientId] = useState<number | null>(null);
+  const styles = useMemo(() => createStyles(isDarkMode), [isDarkMode]);
+  const textColor = isDarkMode ? "#f8fafc" : "#111827";
+  const mutedColor = isDarkMode ? "#a1a1aa" : "#666";
+  const placeholderColor = isDarkMode ? "#94a3b8" : "#888";
+  const modalBackground = isDarkMode ? "#000000" : "#fff";
+  const borderColor = isDarkMode ? "#1f2937" : "#ccc";
 
   // ---------- network / config ----------
-  const LOCAL_IP = "192.168.101.25";
+  const LOCAL_IP = "192.168.100.103";
   const API_BASE =
     Platform.OS === "android"
       ? "http://10.0.2.2:3000"
@@ -443,12 +452,21 @@ export default function PatientsScreen() {
             source={selectedPatient.GENDER === "Female" ? femaleImg : avatarImg}
             style={{ width: 80, height: 80, borderRadius: 40 }}
           />
-          <Text style={{ fontWeight: "700", fontSize: 18, marginTop: 6 }}>
+          <Text
+            style={{
+              fontWeight: "700",
+              fontSize: 18,
+              marginTop: 6,
+              color: textColor,
+            }}
+          >
             {selectedPatient.PATIENT_FNAME}{" "}
             {selectedPatient.PATIENT_LNAME || ""}
           </Text>
-          <Text style={{ color: "#666" }}>MR: {selectedPatient.PMR_NO}</Text>
-          <Text style={{ color: "#666" }}>
+          <Text style={{ color: mutedColor }}>
+            MR: {selectedPatient.PMR_NO}
+          </Text>
+          <Text style={{ color: mutedColor }}>
             ID: {selectedPatient.PATIENT_ID}
           </Text>
         </View>
@@ -532,7 +550,7 @@ export default function PatientsScreen() {
                         <Text
                           style={{
                             fontSize: 10,
-                            color: "#999",
+                            color: mutedColor,
                             marginTop: 2,
                             textAlign: isEven ? "left" : "right",
                           }}
@@ -546,7 +564,9 @@ export default function PatientsScreen() {
                   })}
               </ScrollView>
             ) : (
-              <Text style={{ textAlign: "center", marginTop: 20 }}>
+              <Text
+                style={{ textAlign: "center", marginTop: 20, color: textColor }}
+              >
                 No notes available.
               </Text>
             ))}
@@ -628,8 +648,9 @@ export default function PatientsScreen() {
             }}
             setItems={setBranchItemsState}
             placeholder="Select Branch"
-            style={{ borderColor: "#ccc" }}
-            dropDownContainerStyle={{ borderColor: "#ccc" }}
+            style={{ borderColor, backgroundColor: modalBackground }}
+            dropDownContainerStyle={{ borderColor, backgroundColor: modalBackground }}
+            theme={isDarkMode ? "DARK" : "LIGHT"}
             zIndex={5000}
           />
         </View>
@@ -642,8 +663,9 @@ export default function PatientsScreen() {
             setValue={setWard}
             setItems={setWardItemsState}
             placeholder="Select Ward"
-            style={{ borderColor: "#ccc" }}
-            dropDownContainerStyle={{ borderColor: "#ccc" }}
+            style={{ borderColor, backgroundColor: modalBackground }}
+            dropDownContainerStyle={{ borderColor, backgroundColor: modalBackground }}
+            theme={isDarkMode ? "DARK" : "LIGHT"}
             zIndex={4000}
           />
         </View>
@@ -653,6 +675,7 @@ export default function PatientsScreen() {
         <TextInput
           style={styles.searchInput}
           placeholder="Search patient..."
+          placeholderTextColor={placeholderColor}
           value={searchQuery}
           onChangeText={(text) => setSearchQuery(text)}
         />
@@ -666,7 +689,7 @@ export default function PatientsScreen() {
               padding: 4,
             }}
           >
-            <Ionicons name="close-circle" size={20} color="#999" />
+            <Ionicons name="close-circle" size={20} color={mutedColor} />
           </TouchableOpacity>
         )}
       </View>
@@ -706,13 +729,13 @@ export default function PatientsScreen() {
                   style={{ width: 40, height: 40, borderRadius: 20 }}
                 />
                 <View style={{ marginLeft: 8 }}>
-                  <Text style={{ fontWeight: "600" }}>
+                  <Text style={{ fontWeight: "600", color: textColor }}>
                     {item.PATIENT_FNAME} {item.PATIENT_LNAME || ""}
                   </Text>
-                  <Text style={{ fontSize: 12, color: "#666" }}>
+                  <Text style={{ fontSize: 12, color: mutedColor }}>
                     MR: {item.PMR_NO}
                   </Text>
-                  <Text style={{ fontSize: 12, color: "#666" }}>
+                  <Text style={{ fontSize: 12, color: mutedColor }}>
                     ID: {item.PATIENT_ID}
                   </Text>
                 </View>
@@ -776,14 +799,7 @@ export default function PatientsScreen() {
           avoidKeyboard
           style={{ justifyContent: "center", margin: 16 }}
         >
-          <View
-            style={{
-              backgroundColor: "#fff",
-              borderRadius: 12,
-              padding: 16,
-              maxHeight: "85%",
-            }}
-          >
+          <View style={styles.modalContent}>
             {/* ❌ Cross Button */}
             <TouchableOpacity
               onPress={closeModal}
@@ -795,7 +811,7 @@ export default function PatientsScreen() {
                 padding: 6,
               }}
             >
-              <Text style={{ fontSize: 20, color: "#999" }}>✕</Text>
+              <Text style={{ fontSize: 20, color: mutedColor }}>✕</Text>
             </TouchableOpacity>
 
             <ScrollView style={{ marginTop: 10 }}>
@@ -807,6 +823,7 @@ export default function PatientsScreen() {
                 <TextInput
                   style={styles.messageInput}
                   placeholder="Write note..."
+                  placeholderTextColor={placeholderColor}
                   value={messageText}
                   onChangeText={setMessageText}
                 />
@@ -829,121 +846,131 @@ export default function PatientsScreen() {
     </SafeAreaView>
   );
 }
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9f9f9" },
-  searchInput: {
-    backgroundColor: "#fff",
-    margin: 12,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderColor: "#ccc",
-    borderWidth: 1,
-  },
-  card: {
-    backgroundColor: "#fff",
-    marginHorizontal: 12,
-    marginVertical: 6,
-    padding: 12,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 3,
-  },
-  tabContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap", // allows wrapping on smaller screens
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 10,
-    marginVertical: 8,
-  },
+const createStyles = (isDarkMode: boolean) => {
+  const background = isDarkMode ? "#000000" : "#f9f9f9";
+  const card = isDarkMode ? "#0d0d0d" : "#fff";
+  const border = isDarkMode ? "#1a1a1a" : "#ccc";
+  const inputBackground = isDarkMode ? "#080808" : "#fff";
+  const inputText = isDarkMode ? "#f8fafc" : "#111";
+  const tabIdle = isDarkMode ? "#1f2937" : "#e5e5ea";
+  const aiIconBg = isDarkMode ? "#1c2435" : "#fff";
 
-  // cardButton: {
-  //   flex: 1,
-  //   flexDirection: "row",
-  //   alignItems: "center",
-  //   justifyContent: "center",
-  //   backgroundColor: "#00A652",
-  //   borderRadius: 8,
-  //   paddingVertical: 8,
-  //   marginHorizontal: 2,
-  // },
-
-  cardButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#00A652",
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    marginHorizontal: 2,
-    marginVertical: 2,
-    minWidth: 90,
-    flexShrink: 0, // ❌ prevents shrinking that causes wrapping
-    flexWrap: "nowrap", // ❌ disables wrapping inside button
-  },
-
-  buttonText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
-    textAlign: "center",
-    marginLeft: 6,
-    flexShrink: 1,
-    flexWrap: "nowrap", // ❌ disables text wrapping
-    includeFontPadding: false, // tighter vertical spacing (Android fix)
-  },
-
-  tabRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginVertical: 8,
-  },
-  tabButton: {
-    flex: 1,
-    marginHorizontal: 2,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: "#e5e5ea",
-    alignItems: "center",
-  },
-  tabActive: {
-    backgroundColor: "#00A652",
-  },
-  tabText: {
-    fontSize: 13,
-    color: "#333",
-  },
-  messageBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
-  },
-  messageInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: "#f5f5f5",
-  },
-  sendButton: {
-    backgroundColor: "#00A652",
-    padding: 10,
-    borderRadius: 8,
-    marginLeft: 6,
-  },
-  aiIcon: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 4,
-    elevation: 2,
-  },
-});
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: background },
+    searchInput: {
+      backgroundColor: inputBackground,
+      color: inputText,
+      margin: 12,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderColor: border,
+      borderWidth: 1,
+    },
+    card: {
+      backgroundColor: card,
+      marginHorizontal: 12,
+      marginVertical: 6,
+      padding: 12,
+      borderRadius: 12,
+      shadowColor: "#000",
+      shadowOpacity: isDarkMode ? 0.3 : 0.05,
+      shadowRadius: 5,
+      elevation: 3,
+      borderWidth: 1,
+      borderColor: border,
+    },
+    tabContainer: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 10,
+      marginVertical: 8,
+    },
+    cardButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "#00A652",
+      borderRadius: 8,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      marginHorizontal: 2,
+      marginVertical: 2,
+      minWidth: 90,
+      flexShrink: 0,
+      flexWrap: "nowrap",
+    },
+    buttonText: {
+      color: "#fff",
+      fontSize: 12,
+      fontWeight: "600",
+      textAlign: "center",
+      marginLeft: 6,
+      flexShrink: 1,
+      flexWrap: "nowrap",
+      includeFontPadding: false,
+    },
+    tabRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginVertical: 8,
+    },
+    tabButton: {
+      flex: 1,
+      marginHorizontal: 2,
+      paddingVertical: 8,
+      borderRadius: 8,
+      backgroundColor: tabIdle,
+      alignItems: "center",
+    },
+    tabActive: {
+      backgroundColor: "#00A652",
+    },
+    tabText: {
+      fontSize: 13,
+      color: isDarkMode ? "#f8fafc" : "#333",
+    },
+    messageBox: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginTop: 8,
+    },
+    messageInput: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: border,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      backgroundColor: isDarkMode ? "#1f2937" : "#f5f5f5",
+      color: inputText,
+    },
+    sendButton: {
+      backgroundColor: "#00A652",
+      padding: 10,
+      borderRadius: 8,
+      marginLeft: 6,
+    },
+    aiIcon: {
+      position: "absolute",
+      top: 8,
+      right: 8,
+      backgroundColor: aiIconBg,
+      borderRadius: 16,
+      padding: 4,
+      elevation: 2,
+      borderWidth: isDarkMode ? 1 : 0,
+      borderColor: border,
+    },
+    modalContent: {
+      backgroundColor: card,
+      borderRadius: 12,
+      padding: 16,
+      maxHeight: "85%",
+      borderWidth: 1,
+      borderColor: border,
+    },
+  });
+};

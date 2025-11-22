@@ -12,6 +12,7 @@ import {
     View,
 } from "react-native";
 import { useSession } from "../ctx";
+import { useTheme } from "../ctx/theme";
 
 type Notification = {
   id: string;
@@ -44,10 +45,12 @@ type NotificationsProps = {
 
 export default function Notifications({ visible, onClose, onCountChange }: NotificationsProps) {
   const { session } = useSession();
+  const { isDarkMode, palette } = useTheme();
   const [notifications, setNotifications] = React.useState<Notification[]>([]);
   const [loading, setLoading] = React.useState(false);
+  const styles = React.useMemo(() => createStyles(palette, isDarkMode), [palette, isDarkMode]);
 
-  const LOCAL_IP = "192.168.101.25";
+  const LOCAL_IP = "192.168.100.103";
   const API_BASE =
     Platform.OS === "android" ? "http://10.0.2.2:3000" : `http://${LOCAL_IP}:3000`;
 
@@ -306,7 +309,7 @@ export default function Notifications({ visible, onClose, onCountChange }: Notif
               {/* Header */}
               <View style={styles.header}>
                 <View style={styles.headerLeft}>
-                  <Bell size={20} color="#333" />
+                  <Bell size={20} color={palette.textPrimary} />
                   <Text style={styles.headerText}>Notifications</Text>
                 </View>
                 <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -317,12 +320,12 @@ export default function Notifications({ visible, onClose, onCountChange }: Notif
               {/* Content */}
               {loading ? (
                 <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color="#00A652" />
+                  <ActivityIndicator size="small" color={palette.primary ?? "#00A652"} />
                   <Text style={styles.loadingText}>Loading...</Text>
                 </View>
               ) : notifications.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                  <Bell size={32} color="#9ca3af" />
+                  <Bell size={32} color={palette.textMuted} />
                   <Text style={styles.emptyTitle}>No notifications</Text>
                   <Text style={styles.emptySubtitle}>
                     You're all caught up!
@@ -364,125 +367,128 @@ export default function Notifications({ visible, onClose, onCountChange }: Notif
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
-  },
-  modalContainer: {
-    paddingTop: 60,
-    paddingHorizontal: 16,
-    alignItems: "flex-end",
-  },
-  modal: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    width: 320,
-    maxHeight: 400,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-  },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  headerText: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#1a1a1a",
-  },
-  closeButton: {
-    padding: 4,
-  },
-  closeText: {
-    fontSize: 24,
-    color: "#666",
-  },
-  loadingContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 30,
-  },
-  loadingText: {
-    marginTop: 8,
-    color: "#666",
-    fontSize: 12,
-  },
-  emptyContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 30,
-  },
-  emptyTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1f2937",
-    marginTop: 12,
-  },
-  emptySubtitle: {
-    color: "#6b7280",
-    textAlign: "center",
-    marginTop: 4,
-    fontSize: 12,
-  },
-  list: {
-    maxHeight: 300,
-  },
-  listContent: {
-    padding: 8,
-  },
-  notificationItem: {
-    backgroundColor: "#f9fafb",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    borderLeftWidth: 3,
-    borderLeftColor: "#e5e7eb",
-  },
-  unreadItem: {
-    backgroundColor: "#fff",
-    borderLeftColor: "#00A652",
-  },
-  notificationContent: {
-    flex: 1,
-  },
-  notificationTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1f2937",
-    marginBottom: 4,
-  },
-  notificationMessage: {
-    fontSize: 12,
-    color: "#4b5563",
-    marginBottom: 6,
-    lineHeight: 16,
-  },
-  notificationTime: {
-    fontSize: 11,
-    color: "#9ca3af",
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#00A652",
-    marginLeft: 8,
-    marginTop: 4,
-  },
-});
+const createStyles = (palette: ThemePalette, isDarkMode: boolean) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: isDarkMode ? "rgba(0,0,0,0.8)" : "rgba(0,0,0,0.3)",
+    },
+    modalContainer: {
+      paddingTop: 60,
+      paddingHorizontal: 16,
+      alignItems: "flex-end",
+    },
+    modal: {
+      backgroundColor: palette.card ?? "#fff",
+      borderRadius: 12,
+      width: 320,
+      maxHeight: 400,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 16,
+      elevation: 12,
+      borderWidth: 1,
+      borderColor: palette.border ?? "#e5e7eb",
+    },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border ?? "#e5e7eb",
+    },
+    headerLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    headerText: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: palette.text ?? "#1a1a1a",
+    },
+    closeButton: {
+      padding: 4,
+    },
+    closeText: {
+      fontSize: 24,
+      color: palette.mutedText ?? "#666",
+    },
+    loadingContainer: {
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 30,
+    },
+    loadingText: {
+      marginTop: 8,
+      color: palette.mutedText ?? "#666",
+      fontSize: 12,
+    },
+    emptyContainer: {
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 30,
+    },
+    emptyTitle: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: palette.text ?? "#1f2937",
+      marginTop: 12,
+    },
+    emptySubtitle: {
+      color: palette.mutedText ?? "#6b7280",
+      textAlign: "center",
+      marginTop: 4,
+      fontSize: 12,
+    },
+    list: {
+      maxHeight: 300,
+    },
+    listContent: {
+      padding: 8,
+    },
+    notificationItem: {
+      backgroundColor: palette.surface ?? (isDarkMode ? "#080808" : "#f9fafb"),
+      borderRadius: 8,
+      padding: 12,
+      marginBottom: 8,
+      flexDirection: "row",
+      alignItems: "flex-start",
+      borderLeftWidth: 3,
+      borderLeftColor: palette.border ?? "#e5e7eb",
+    },
+    unreadItem: {
+      backgroundColor: palette.card ?? "#fff",
+      borderLeftColor: palette.primary ?? "#00A652",
+    },
+    notificationContent: {
+      flex: 1,
+    },
+    notificationTitle: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: palette.text ?? "#1f2937",
+      marginBottom: 4,
+    },
+    notificationMessage: {
+      fontSize: 12,
+      color: palette.mutedText ?? "#4b5563",
+      marginBottom: 6,
+      lineHeight: 16,
+    },
+    notificationTime: {
+      fontSize: 11,
+      color: palette.textSubtle ?? "#9ca3af",
+    },
+    unreadDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: palette.primary ?? "#00A652",
+      marginLeft: 8,
+      marginTop: 4,
+    },
+  });
 

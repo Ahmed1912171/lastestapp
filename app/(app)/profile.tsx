@@ -2,9 +2,10 @@ import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import React from "react";
 import {
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import SimpleAvatar from "../../components/SimpleAvatar";
@@ -12,7 +13,7 @@ import { useSession } from "../../ctx";
 import { useTheme } from "../../ctx/theme"; // ✅ global theme hook
 
 export default function Profile() {
-  const { isDarkMode } = useTheme();
+  const { isDarkMode, toggleDarkMode } = useTheme();
   const { session, signOut } = useSession();
 
   const userAny = session?.user as any;
@@ -86,6 +87,23 @@ export default function Profile() {
             >
               {session?.user?.GR_EMPLOYER_LOGIN || "N/A"}
             </Text>
+          </View>
+
+          <View style={styles.darkModeRow}>
+            <Text
+              style={[
+                styles.infoLabel,
+                { color: isDarkMode ? "#fff" : "#111" },
+              ]}
+            >
+              Dark Mode
+            </Text>
+            <Switch
+              value={isDarkMode}
+              onValueChange={toggleDarkMode}
+              trackColor={{ false: "#d1d5db", true: "#2563eb" }}
+              thumbColor="#fff"
+            />
           </View>
         </View>
 

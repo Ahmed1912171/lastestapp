@@ -1,6 +1,6 @@
 import axios from "axios";
 import { Stack, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Image,
@@ -11,6 +11,7 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTheme } from "../../ctx/theme";
 
 // ✅ Import the new component
 import LabTable from "../../components/LabTable";
@@ -57,7 +58,10 @@ export default function PatientDetailScreen() {
   );
   const [notes, setNotes] = useState<Note[]>([]);
   const [radiologyReports, setRadiologyReports] = useState<Radiology[]>([]);
-  const LOCAL_IP = "192.168.101.25";
+  const LOCAL_IP = "192.168.100.103";
+  const { isDarkMode } = useTheme();
+  const palette = useMemo(() => buildDetailPalette(isDarkMode), [isDarkMode]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
 
   // 🔹 Fetch patient data
   useEffect(() => {
@@ -91,8 +95,8 @@ export default function PatientDetailScreen() {
       <SafeAreaView style={styles.container}>
         <ActivityIndicator
           size="large"
-          color="#00A652"
-          style={{ marginTop: 50 }}
+          color={palette.accent}
+          style={styles.loader}
         />
       </SafeAreaView>
     );
@@ -101,9 +105,7 @@ export default function PatientDetailScreen() {
   if (!patient) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text style={{ textAlign: "center", marginTop: 50 }}>
-          Patient not found.
-        </Text>
+        <Text style={styles.emptyMessage}>Patient not found.</Text>
       </SafeAreaView>
     );
   }
@@ -154,13 +156,16 @@ export default function PatientDetailScreen() {
           {["notes", "lab", "radiology"].map((tab) => (
             <TouchableOpacity
               key={tab}
-              style={[styles.tabButton, activeTab === tab && styles.tabActive]}
+              style={[
+                styles.tabButton,
+                activeTab === tab && styles.tabActive,
+              ]}
               onPress={() => setActiveTab(tab as any)}
             >
               <Text
                 style={[
                   styles.tabText,
-                  activeTab === tab && { color: "#fff", fontWeight: "700" },
+                  activeTab === tab && styles.tabTextActive,
                 ]}
               >
                 {tab === "notes"
@@ -180,11 +185,11 @@ export default function PatientDetailScreen() {
             (notes.length > 0 ? (
               notes.map((note) => (
                 <View key={note.Loc_ID} style={styles.card}>
-                  <Text>{note.LocalExamination}</Text>
+                  <Text style={styles.bodyText}>{note.LocalExamination}</Text>
                 </View>
               ))
             ) : (
-              <Text>No notes available.</Text>
+              <Text style={styles.bodyTextMuted}>No notes available.</Text>
             ))}
 
           {/* ✅ Lab Reports — replaced with component */}
@@ -197,21 +202,27 @@ export default function PatientDetailScreen() {
             (radiologyReports.length > 0 ? (
               radiologyReports.map((rad) => (
                 <View key={rad.id} style={styles.card}>
-                  <Text style={{ fontWeight: "600" }}>
+                  <Text style={styles.cardTitle}>
                     PMR No: {rad.pmr_no}
                   </Text>
-                  <Text>Status: {rad.status}</Text>
-                  <Text>X-Ray: {rad.xray_status}</Text>
-                  <Text>CT: {rad.ct_status}</Text>
-                  <Text>Priority: {rad.priority}</Text>
-                  <Text>Modality: {rad.modality}</Text>
-                  <Text>Region: {rad.mod_region}</Text>
-                  <Text>Request Time: {rad.request_time}</Text>
-                  <Text>History: {rad.short_history}</Text>
+                  <Text style={styles.bodyText}>Status: {rad.status}</Text>
+                  <Text style={styles.bodyText}>X-Ray: {rad.xray_status}</Text>
+                  <Text style={styles.bodyText}>CT: {rad.ct_status}</Text>
+                  <Text style={styles.bodyText}>Priority: {rad.priority}</Text>
+                  <Text style={styles.bodyText}>Modality: {rad.modality}</Text>
+                  <Text style={styles.bodyText}>Region: {rad.mod_region}</Text>
+                  <Text style={styles.bodyText}>
+                    Request Time: {rad.request_time}
+                  </Text>
+                  <Text style={styles.bodyText}>
+                    History: {rad.short_history}
+                  </Text>
                 </View>
               ))
             ) : (
-              <Text>No radiology reports available.</Text>
+              <Text style={styles.bodyTextMuted}>
+                No radiology reports available.
+              </Text>
             ))}
         </View>
       </ScrollView>
@@ -219,52 +230,91 @@ export default function PatientDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f3f4f6" },
-  scrollContent: { padding: 16, paddingBottom: 40 },
-  header: { alignItems: "center", marginBottom: 20 },
-  avatar: { width: 100, height: 100, borderRadius: 50, marginBottom: 12 },
-  name: { fontSize: 22, fontWeight: "700" },
-  mr: { fontSize: 14, color: "#666" },
+const createStyles = (palette: DetailPalette) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: palette.background },
+    scrollContent: { padding: 16, paddingBottom: 40 },
+    loader: { marginTop: 50 },
+    emptyMessage: {
+      textAlign: "center",
+      marginTop: 50,
+      color: palette.textMuted,
+    },
+    header: { alignItems: "center", marginBottom: 20 },
+    avatar: { width: 100, height: 100, borderRadius: 50, marginBottom: 12 },
+    name: { fontSize: 22, fontWeight: "700", color: palette.textPrimary },
+    mr: { fontSize: 14, color: palette.textMuted },
 
-  tabRow: { flexDirection: "row", marginBottom: 16 },
-  tabButton: {
-    flex: 1,
-    padding: 8,
-    borderWidth: 1,
-    borderColor: "#00A652",
-    borderRadius: 8,
-    marginHorizontal: 4,
-    alignItems: "center",
-  },
-  tabActive: { backgroundColor: "#00A652" },
-  tabText: { color: "#00A652", fontWeight: "600" },
+    tabRow: { flexDirection: "row", marginBottom: 16 },
+    tabButton: {
+      flex: 1,
+      padding: 10,
+      borderWidth: 1,
+      borderColor: palette.accent,
+      borderRadius: 10,
+      marginHorizontal: 4,
+      alignItems: "center",
+      backgroundColor: palette.background,
+    },
+    tabActive: { backgroundColor: palette.accent },
+    tabText: { color: palette.accent, fontWeight: "600" },
+    tabTextActive: { color: "#fff", fontWeight: "700" },
 
-  tabContent: { marginBottom: 16 },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 12,
-  },
+    tabContent: { marginBottom: 16 },
+    card: {
+      backgroundColor: palette.card,
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    cardTitle: {
+      fontWeight: "600",
+      color: palette.textPrimary,
+      marginBottom: 4,
+    },
+    bodyText: { color: palette.textPrimary, marginBottom: 2 },
+    bodyTextMuted: { color: palette.textMuted, marginBottom: 8 },
 
-  // Patient Info Table
-  reportTable: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    overflow: "hidden",
-  },
-  reportRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-  },
-  reportLabel: { fontWeight: "600", fontSize: 14, color: "#000", flex: 1 },
-  reportValue: { fontSize: 14, color: "#333", flex: 1, textAlign: "right" },
+    // Patient Info Table
+    reportTable: {
+      backgroundColor: palette.card,
+      borderRadius: 10,
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: palette.border,
+      overflow: "hidden",
+    },
+    reportRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      paddingVertical: 10,
+      paddingHorizontal: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+    },
+    reportLabel: {
+      fontWeight: "600",
+      fontSize: 14,
+      color: palette.textPrimary,
+      flex: 1,
+    },
+    reportValue: {
+      fontSize: 14,
+      color: palette.textPrimary,
+      flex: 1,
+      textAlign: "right",
+    },
+  });
+
+type DetailPalette = ReturnType<typeof buildDetailPalette>;
+
+const buildDetailPalette = (isDarkMode: boolean) => ({
+  background: isDarkMode ? "#000000" : "#f3f4f6",
+  card: isDarkMode ? "#0d0d0d" : "#fff",
+  border: isDarkMode ? "#1a1a1a" : "#e5e7eb",
+  textPrimary: isDarkMode ? "#f8fafc" : "#111827",
+  textMuted: isDarkMode ? "#a1a1aa" : "#666",
+  accent: "#00A652",
 });

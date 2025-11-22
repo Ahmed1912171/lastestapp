@@ -12,7 +12,7 @@ import {
     MapPin,
     UserCheck
 } from "lucide-react-native";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -27,6 +27,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSession } from "../ctx";
+import { useTheme } from "../ctx/theme";
 import SimpleAvatar from "./SimpleAvatar";
 
 // ✅ Attendance log type matching database structure
@@ -174,6 +175,12 @@ type AttendanceScreenProps = {
 
 export default function AttendanceScreen({ onBack }: AttendanceScreenProps) {
   const { session } = useSession();
+  const { isDarkMode } = useTheme();
+  const palette = useMemo(
+    () => buildAttendancePalette(isDarkMode),
+    [isDarkMode]
+  );
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const [attendanceLogs, setAttendanceLogs] = useState<AttendanceLog[]>([]);
   const [stats, setStats] = useState<Stats>({
     totalDays: 0,
@@ -196,7 +203,7 @@ export default function AttendanceScreen({ onBack }: AttendanceScreenProps) {
   const [selectedFilter, setSelectedFilter] = useState<'total' | 'ontime' | 'late' | 'early'>('total');
 
   // ✅ API Configuration
-  const LOCAL_IP = "192.168.101.25";
+  const LOCAL_IP = "192.168.100.103";
   const API_BASE =
     Platform.OS === "android"
       ? "http://10.0.2.2:3000"
@@ -638,12 +645,12 @@ export default function AttendanceScreen({ onBack }: AttendanceScreenProps) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
       {/* Header with conditional back button - matches LeavesScreen */}
       {onBack ? (
         <View style={styles.header}>
           <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <ArrowLeft size={24} color="#333" />
+            <ArrowLeft size={24} color={palette.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Attendance</Text>
           <View style={{ width: 40 }} />
@@ -665,8 +672,8 @@ export default function AttendanceScreen({ onBack }: AttendanceScreenProps) {
 
       {/* Attendance Logs - Pull to Refresh Wrapper */}
       <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}
+        style={styles.scrollArea}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={true}
         bounces={true}
         alwaysBounceVertical={true}
@@ -674,10 +681,10 @@ export default function AttendanceScreen({ onBack }: AttendanceScreenProps) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={["#00A652", "#3b82f6"]}
-            tintColor="#00A652"
+            colors={[palette.accent, palette.accentSecondary]}
+            tintColor={palette.accent}
             title="Pull to refresh"
-            titleColor="#666"
+            titleColor={palette.textMuted}
           />
         }
       >
@@ -690,13 +697,13 @@ export default function AttendanceScreen({ onBack }: AttendanceScreenProps) {
           }}
         >
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
-            <MapPin size={18} color="#666" />
+            <MapPin size={18} color={palette.textMuted} />
             <Text
               style={{
                 fontSize: 14,
                 fontWeight: "600",
                 marginLeft: 6,
-                color: "#333",
+                color: palette.textPrimary,
               }}
             >
               {locationStatus}
@@ -868,7 +875,9 @@ export default function AttendanceScreen({ onBack }: AttendanceScreenProps) {
 
           if (filteredDays.length === 0) {
             return (
-              <Text style={{ textAlign: "center", color: "#666", marginTop: 40 }}>
+              <Text
+                style={{ textAlign: "center", color: palette.textMuted, marginTop: 40 }}
+              >
                 No {selectedFilter === 'total' ? '' : selectedFilter === 'ontime' ? 'on-time' : selectedFilter === 'late' ? 'late' : 'left early'} records found.
               </Text>
             );
@@ -880,11 +889,11 @@ export default function AttendanceScreen({ onBack }: AttendanceScreenProps) {
             const hasCheckOut = !!day.checkOut;
 
             return (
-              <View 
-                key={day.date} 
+              <View
+                key={day.date}
                 style={[
                   styles.logCard,
-                  { borderLeftWidth: 3, borderLeftColor: "#00A652" }
+                  { borderLeftWidth: 3, borderLeftColor: palette.accent },
                 ]}
               >
                 {/* Header: Date & Badges */}
@@ -919,7 +928,7 @@ export default function AttendanceScreen({ onBack }: AttendanceScreenProps) {
                   {day.checkIn && (
                     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <View style={[styles.compactIconWrapper, { backgroundColor: '#00A65220' }]}>
-                        <UserCheck size={14} color="#00A652" />
+                        <UserCheck size={14} color={palette.accent} />
                       </View>
                       <View>
                         <Text style={styles.timeLabel}>IN</Text>
@@ -951,235 +960,270 @@ export default function AttendanceScreen({ onBack }: AttendanceScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#f3f4f6",
-  },
-  container: {
-    flex: 1,
-    backgroundColor: "#f3f4f6",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#1a1a1a",
-  },
-  title: { fontSize: 20, fontWeight: "600" },
-  subtitle: { color: "#666", fontSize: 14 },
-  pinText: { color: "#999", fontSize: 12, marginTop: 2 },
+type AttendancePalette = ReturnType<typeof buildAttendancePalette>;
 
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-    marginBottom: 12,
-  },
-
-  checkInButton: {
-    flex: 1,
-    backgroundColor: "#00A652",
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 100,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
-  },
-
-  checkInButtonActive: {
-    backgroundColor: "#9ca3af",
-  },
-
-  checkOutButton: {
-    flex: 1,
-    backgroundColor: "#00A652",
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 100,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
-  },
-
-  checkOutButtonActive: {
-    backgroundColor: "#9ca3af",
-  },
-
-  buttonDisabled: {
-    backgroundColor: "#9ca3af",
-    opacity: 0.6,
-  },
-
-  buttonLabel: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 16,
-    marginTop: 8,
-  },
-
-  buttonTime: {
-    color: "#fff",
-    fontSize: 12,
-    marginTop: 4,
-    opacity: 0.9,
-  },
-
-  statsContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 12,
-  },
-  statsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 4,
-  },
-  statCard: {
-    backgroundColor: "#fff",
-    flex: 1,
-    marginHorizontal: 2,
-    borderRadius: 8,
-    padding: 6,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
-    borderWidth: 2,
-    borderColor: "transparent",
-  },
-  statCardActive: {
-    borderColor: "#00A652",
-    backgroundColor: "#f0fdf4",
-  },
-  iconWrapper: {
-    padding: 5,
-    backgroundColor: "#f0fdf4",
-    borderRadius: 6,
-    marginBottom: 3,
-  },
-  statLabel: { color: "#666", marginTop: 2, fontSize: 9, textAlign: "center" },
-  statValue: { fontSize: 13, fontWeight: "700", marginTop: 1 },
-
-  logCard: {
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
-  },
-
-  singleLineRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-
-  compactIconWrapper: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  compactDate: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#1a1a1a",
-  },
-
-  compactDayOfWeek: {
-    fontSize: 10,
-    color: "#999",
-    fontWeight: "500",
-  },
-
-  compactTime: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#1a1a1a",
-  },
-
-  compactBadgeContainer: {
-    flexDirection: "row",
-    gap: 4,
-    alignItems: "center",
-  },
-
-  logCardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-
-  timeRowCombined: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "center",
-  },
-
-  timeLabel: {
-    fontSize: 9,
-    color: "#999",
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-
-  errorContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  errorText: {
-    color: "#dc3545",
-    fontSize: 16,
-    textAlign: "center",
-  },
-
-  badgeLate: {
-    backgroundColor: "#fecaca",
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  badgeEarly: {
-    backgroundColor: "#fef3c7",
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  badgeText: {
-    fontSize: 8,
-    fontWeight: "700",
-    color: "#1a1a1a",
-  },
+const buildAttendancePalette = (isDarkMode: boolean) => ({
+  background: isDarkMode ? "#000000" : "#f3f4f6",
+  card: isDarkMode ? "#0d0d0d" : "#fff",
+  surface: isDarkMode ? "#080808" : "#fff",
+  border: isDarkMode ? "#1a1a1a" : "#e5e7eb",
+  textPrimary: isDarkMode ? "#f8fafc" : "#1a1a1a",
+  textMuted: isDarkMode ? "#a1a1aa" : "#666",
+  pin: isDarkMode ? "#cbd5f5" : "#999",
+  accent: "#00A652",
+  accentSecondary: "#3b82f6",
+  iconBackground: isDarkMode ? "rgba(34,197,94,0.12)" : "#f0fdf4",
+  disabled: isDarkMode ? "#475569" : "#9ca3af",
+  statActiveBg: isDarkMode ? "rgba(34,197,94,0.15)" : "#f0fdf4",
+  error: "#f87171",
+  badgeLateBg: "#fecaca",
+  badgeEarlyBg: "#fef3c7",
+  badgeText: "#1a1a1a",
 });
+
+const createStyles = (palette: AttendancePalette) =>
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: palette.background,
+    },
+    container: {
+      flex: 1,
+      backgroundColor: palette.background,
+    },
+    scrollArea: {
+      flex: 1,
+      backgroundColor: palette.background,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      paddingBottom: 20,
+    },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: 16,
+      backgroundColor: palette.card,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+    },
+    backButton: {
+      padding: 8,
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: "600",
+      color: palette.textPrimary,
+    },
+    title: { fontSize: 20, fontWeight: "600", color: palette.textPrimary },
+    subtitle: { color: palette.textMuted, fontSize: 14 },
+    pinText: { color: palette.pin, fontSize: 12, marginTop: 2 },
+
+    buttonRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      gap: 12,
+      marginBottom: 12,
+    },
+
+    checkInButton: {
+      flex: 1,
+      backgroundColor: palette.accent,
+      borderRadius: 12,
+      padding: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: 100,
+      shadowColor: "#000",
+      shadowOpacity: 0.1,
+      shadowRadius: 5,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 3,
+    },
+
+    checkInButtonActive: {
+      backgroundColor: palette.disabled,
+    },
+
+    checkOutButton: {
+      flex: 1,
+      backgroundColor: palette.accent,
+      borderRadius: 12,
+      padding: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: 100,
+      shadowColor: "#000",
+      shadowOpacity: 0.1,
+      shadowRadius: 5,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 3,
+    },
+
+    checkOutButtonActive: {
+      backgroundColor: palette.disabled,
+    },
+
+    buttonDisabled: {
+      backgroundColor: palette.disabled,
+      opacity: 0.6,
+    },
+
+    buttonLabel: {
+      color: "#fff",
+      fontWeight: "700",
+      fontSize: 16,
+      marginTop: 8,
+    },
+
+    buttonTime: {
+      color: "#fff",
+      fontSize: 12,
+      marginTop: 4,
+      opacity: 0.9,
+    },
+
+    statsContainer: {
+      paddingHorizontal: 16,
+      marginBottom: 12,
+    },
+    statsRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      gap: 4,
+    },
+    statCard: {
+      backgroundColor: palette.card,
+      flex: 1,
+      marginHorizontal: 2,
+      borderRadius: 8,
+      padding: 6,
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOpacity: 0.04,
+      shadowRadius: 3,
+      shadowOffset: { width: 0, height: 1 },
+      elevation: 2,
+      borderWidth: 2,
+      borderColor: "transparent",
+    },
+    statCardActive: {
+      borderColor: palette.accent,
+      backgroundColor: palette.statActiveBg,
+    },
+    iconWrapper: {
+      padding: 5,
+      backgroundColor: palette.iconBackground,
+      borderRadius: 6,
+      marginBottom: 3,
+    },
+    statLabel: {
+      color: palette.textMuted,
+      marginTop: 2,
+      fontSize: 9,
+      textAlign: "center",
+    },
+    statValue: { fontSize: 13, fontWeight: "700", marginTop: 1, color: palette.textPrimary },
+
+    logCard: {
+      backgroundColor: palette.card,
+      borderRadius: 8,
+      padding: 10,
+      marginBottom: 8,
+      shadowColor: "#000",
+      shadowOpacity: 0.04,
+      shadowRadius: 3,
+      shadowOffset: { width: 0, height: 1 },
+      elevation: 2,
+    },
+
+    singleLineRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+
+    compactIconWrapper: {
+      width: 28,
+      height: 28,
+      borderRadius: 6,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+
+    compactDate: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: palette.textPrimary,
+    },
+
+    compactDayOfWeek: {
+      fontSize: 10,
+      color: palette.textMuted,
+      fontWeight: "500",
+    },
+
+    compactTime: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: palette.textPrimary,
+    },
+
+    compactBadgeContainer: {
+      flexDirection: "row",
+      gap: 4,
+      alignItems: "center",
+    },
+
+    logCardHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8,
+    },
+
+    timeRowCombined: {
+      flexDirection: "row",
+      gap: 10,
+      alignItems: "center",
+    },
+
+    timeLabel: {
+      fontSize: 9,
+      color: palette.textMuted,
+      fontWeight: "700",
+      letterSpacing: 0.5,
+    },
+
+    errorContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 20,
+    },
+    errorText: {
+      color: palette.error,
+      fontSize: 16,
+      textAlign: "center",
+    },
+
+    badgeLate: {
+      backgroundColor: palette.badgeLateBg,
+      paddingHorizontal: 5,
+      paddingVertical: 2,
+      borderRadius: 4,
+    },
+    badgeEarly: {
+      backgroundColor: palette.badgeEarlyBg,
+      paddingHorizontal: 5,
+      paddingVertical: 2,
+      borderRadius: 4,
+    },
+    badgeText: {
+      fontSize: 8,
+      fontWeight: "700",
+      color: palette.badgeText,
+    },
+  });
 

@@ -12,7 +12,7 @@ import {
     Users,
     Warehouse,
 } from "lucide-react-native";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     RefreshControl,
@@ -21,7 +21,7 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
-    View
+    View,
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -30,6 +30,7 @@ import Notifications from "../../components/Notifications";
 import SimpleAvatar from "../../components/SimpleAvatar";
 import SimpleChart from "../../components/SimpleChart";
 import { useSession } from "../../ctx";
+import { useTheme } from "../../ctx/theme";
 
 type WardData = {
   ward_id: number;
@@ -54,6 +55,7 @@ type BranchData = Record<string, BranchWards>;
 
 export default function Dashboard() {
   const { session } = useSession();
+  const { isDarkMode } = useTheme();
   const [branchOpen, setBranchOpen] = useState(false);
   const [wardOpen, setWardOpen] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState<string>("");
@@ -66,12 +68,13 @@ export default function Dashboard() {
   const [showAI, setShowAI] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
+  const styles = useMemo(() => createStyles(isDarkMode), [isDarkMode]);
 
   // ✅ Total Tests state
   const [testCount, setTestCount] = useState<number | null>(null);
   const [loadingCount, setLoadingCount] = useState(false);
 
-  const LOCAL_IP = "192.168.101.25";
+  const LOCAL_IP = "192.168.100.103";
 
   // ---------- Dynamic Date ----------
   useEffect(() => {
@@ -262,7 +265,7 @@ export default function Dashboard() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
       <ScrollView
         style={styles.container}
         refreshControl={
@@ -319,6 +322,7 @@ export default function Dashboard() {
               dropDownDirection="AUTO"
               zIndex={6000}
               zIndexInverse={1000}
+              theme={isDarkMode ? "DARK" : "LIGHT"}
             />
           </View>
 
@@ -334,6 +338,7 @@ export default function Dashboard() {
               dropDownDirection="AUTO"
               zIndex={5000}
               zIndexInverse={2000}
+              theme={isDarkMode ? "DARK" : "LIGHT"}
             />
           </View>
         </View>
@@ -487,115 +492,129 @@ export default function Dashboard() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#f3f4f6" },
-  container: { flex: 1, padding: 16 },
+const createStyles = (isDarkMode: boolean) => {
+  const background = isDarkMode ? "#000000" : "#f3f4f6";
+  const surface = isDarkMode ? "#080808" : "#fff";
+  const card = isDarkMode ? "#0d0d0d" : "#fff";
+  const border = isDarkMode ? "#1a1a1a" : "#e5e7eb";
+  const textPrimary = isDarkMode ? "#f8fafc" : "#111827";
+  const textMuted = isDarkMode ? "#94a3b8" : "#666";
 
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  notificationButton: {
-    padding: 8,
-    borderRadius: 20,
-  },
-  bellContainer: {
-    position: "relative",
-  },
-  badge: {
-    position: "absolute",
-    top: -2,
-    right: -2,
-    backgroundColor: "#ef4444",
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 4,
-    borderWidth: 1.5,
-    borderColor: "#fff",
-  },
-  badgeText: {
-    color: "#fff",
-    fontSize: 9,
-    fontWeight: "700",
-  },
-  hello: { fontSize: 24, fontWeight: "700" },
-  date: { color: "#666" },
+  return StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: background },
+    container: { flex: 1, padding: 16, backgroundColor: background },
 
-  filters: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 16,
-    position: "relative",
-    zIndex: 9999,
-  },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 16,
+    },
+    headerRight: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    notificationButton: {
+      padding: 8,
+      borderRadius: 20,
+      backgroundColor: isDarkMode ? "rgba(255,255,255,0.06)" : "transparent",
+    },
+    bellContainer: {
+      position: "relative",
+    },
+    badge: {
+      position: "absolute",
+      top: -2,
+      right: -2,
+      backgroundColor: "#ef4444",
+      borderRadius: 8,
+      minWidth: 16,
+      height: 16,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: 4,
+      borderWidth: 1.5,
+      borderColor: background,
+    },
+    badgeText: {
+      color: "#fff",
+      fontSize: 9,
+      fontWeight: "700",
+    },
+    hello: { fontSize: 24, fontWeight: "700", color: textPrimary },
+    date: { color: textMuted },
 
-  dropdownContainer: {
-    flex: 1,
-    marginRight: 8,
-    position: "relative",
-    zIndex: 9999,
-  },
+    filters: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 16,
+      position: "relative",
+      zIndex: 9999,
+    },
 
-  dropdownLabel: { marginBottom: 4, fontWeight: "600" },
+    dropdownContainer: {
+      flex: 1,
+      marginRight: 8,
+      position: "relative",
+      zIndex: 9999,
+    },
 
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 16,
-  },
+    dropdownLabel: { marginBottom: 4, fontWeight: "600", color: textPrimary },
 
-  cardHeader: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
-  cardTitle: { marginLeft: 4, fontSize: 16, fontWeight: "600" },
+    card: {
+      backgroundColor: card,
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: border,
+    },
 
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    marginVertical: 16,
-  },
+    cardHeader: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+    cardTitle: { marginLeft: 4, fontSize: 16, fontWeight: "600", color: textPrimary },
 
-  statCard: {
-    width: "48%",
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 12,
-  },
+    statsGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+      marginVertical: 16,
+    },
 
-  fab: {
-    position: "absolute",
-    bottom: 30,
-    right: 5,
-    backgroundColor: "#00A652",
-    width: 50,
-    height: 50,
-    borderRadius: 30,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 5,
-  },
+    statCard: {
+      width: "48%",
+      backgroundColor: surface,
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: border,
+    },
 
-  statRow: { flexDirection: "row", alignItems: "center" },
-  iconWrapper: {
-    padding: 8,
-    backgroundColor: "#f0fdf4",
-    borderRadius: 8,
-    marginRight: 8,
-  },
-  statLabel: { fontSize: 12, color: "#666" },
-  statValue: { fontSize: 14, fontWeight: "600" },
-});
+    fab: {
+      position: "absolute",
+      bottom: 30,
+      right: 5,
+      backgroundColor: "#00A652",
+      width: 50,
+      height: 50,
+      borderRadius: 30,
+      justifyContent: "center",
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOpacity: 0.3,
+      shadowRadius: 5,
+      elevation: 5,
+    },
+
+    statRow: { flexDirection: "row", alignItems: "center" },
+    iconWrapper: {
+      padding: 8,
+      backgroundColor: isDarkMode ? "#1f3d3d" : "#f0fdf4",
+      borderRadius: 8,
+      marginRight: 8,
+    },
+    statLabel: { fontSize: 12, color: textMuted },
+    statValue: { fontSize: 14, fontWeight: "600", color: textPrimary },
+  });
+};

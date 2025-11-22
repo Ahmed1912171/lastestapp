@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
     Alert,
     KeyboardAvoidingView,
@@ -12,7 +12,8 @@ import {
     View,
 } from "react-native";
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
-import { SafeAreaView } from "react-native-safe-area-context"; // ✅ CORRECT
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useTheme } from "../ctx/theme";
 
 type Props = {
   patient: {
@@ -38,7 +39,11 @@ type PreviewRow = {
   Specimun?: string | number;
 };
 
+type ThemePalette = ReturnType<typeof useTheme>["palette"];
+
 export default function NewTestRegistration({ patient, branch }: Props) {
+  const { isDarkMode, palette } = useTheme();
+  const styles = useMemo(() => createStyles(palette, isDarkMode), [palette, isDarkMode]);
   const [form] = useState({
     branch,
     Patient_ID: String(patient.id),
@@ -57,7 +62,7 @@ export default function NewTestRegistration({ patient, branch }: Props) {
   const scrollRef = useRef<ScrollView | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const API_BASE = "http://192.168.101.25:3000";
+  const API_BASE = "http://192.168.100.103:3000";
   const DEBOUNCE = 250;
 
   async function fetchJsonSafe(url: string, opts?: RequestInit) {
@@ -278,81 +283,89 @@ export default function NewTestRegistration({ patient, branch }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#fff" },
-  container: { padding: 20, paddingBottom: 80 },
-  title: {
-    fontSize: 22,
-    fontWeight: "700",
-    textAlign: "center",
-    marginBottom: 12,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 6,
-    padding: 10,
-    backgroundColor: "#fafafa",
-  },
-  dropdown: { borderWidth: 1, borderColor: "#ddd", backgroundColor: "#fff" },
-  dropdownItem: { padding: 10 },
+const createStyles = (palette: ThemePalette, isDarkMode: boolean) =>
+  StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: palette.background ?? "#fff" },
+    container: { padding: 20, paddingBottom: 80 },
+    title: {
+      fontSize: 22,
+      fontWeight: "700",
+      textAlign: "center",
+      marginBottom: 12,
+      color: palette.text ?? "#111",
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: palette.border ?? "#ccc",
+      borderRadius: 6,
+      padding: 10,
+      backgroundColor: palette.surface ?? "#fafafa",
+      color: palette.text ?? "#111",
+    },
+    dropdown: {
+      borderWidth: 1,
+      borderColor: palette.border ?? "#ddd",
+      backgroundColor: palette.card ?? "#fff",
+    },
+    dropdownItem: { padding: 10 },
 
-  tableBox: {
-    marginTop: 14,
-    borderWidth: 1.5,
-    borderColor: "#00A652",
-    borderRadius: 10,
-    overflow: "hidden",
-  },
-  tableTitle: {
-    backgroundColor: "#00A652",
-    color: "#fff",
-    fontWeight: "700",
-    paddingVertical: 10,
-    textAlign: "center",
-    fontSize: 15,
-  },
-  tableHeader: {
-    flexDirection: "row",
-    backgroundColor: "#caffda",
-    borderBottomWidth: 1,
-    borderColor: "#00A652",
-  },
-  cellHeader: {
-    textAlign: "center",
-    fontWeight: "700",
-    fontSize: 13,
-    paddingVertical: 6,
-    color: "#006600",
-  },
-  tableRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-    backgroundColor: "#f9fff9",
-  },
-  cellText: {
-    textAlign: "center",
-    fontSize: 14,
-    color: "#000",
-    paddingVertical: 4,
-  },
-  deleteCell: { width: 40, alignItems: "center" },
-  deleteX: { color: "red", fontWeight: "700", fontSize: 18 },
-  deleteSwipeBox: {
-    backgroundColor: "red",
-    justifyContent: "center",
-    alignItems: "center",
-    width: 80,
-  },
-  deleteSwipeText: { color: "#fff", fontWeight: "700", fontSize: 15 },
-  saveBtn: {
-    marginTop: 20,
-    backgroundColor: "#00A652",
-    padding: 14,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  saveBtnText: { color: "#fff", fontWeight: "700" },
-});
+    tableBox: {
+      marginTop: 14,
+      borderWidth: 1.5,
+      borderColor: palette.primary ?? "#00A652",
+      borderRadius: 10,
+      overflow: "hidden",
+      backgroundColor: palette.card ?? "#fff",
+    },
+    tableTitle: {
+      backgroundColor: palette.primary ?? "#00A652",
+      color: "#fff",
+      fontWeight: "700",
+      paddingVertical: 10,
+      textAlign: "center",
+      fontSize: 15,
+    },
+    tableHeader: {
+      flexDirection: "row",
+      backgroundColor: isDarkMode ? "rgba(16,185,129,0.15)" : "#caffda",
+      borderBottomWidth: 1,
+      borderColor: palette.primary ?? "#00A652",
+    },
+    cellHeader: {
+      textAlign: "center",
+      fontWeight: "700",
+      fontSize: 13,
+      paddingVertical: 6,
+      color: palette.primary ?? "#006600",
+    },
+    tableRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 6,
+      paddingHorizontal: 4,
+      backgroundColor: isDarkMode ? "#0d0d0d" : "#f9fff9",
+    },
+    cellText: {
+      textAlign: "center",
+      fontSize: 14,
+      color: palette.text ?? "#000",
+      paddingVertical: 4,
+    },
+    deleteCell: { width: 40, alignItems: "center" },
+    deleteX: { color: "#ef4444", fontWeight: "700", fontSize: 18 },
+    deleteSwipeBox: {
+      backgroundColor: "#ef4444",
+      justifyContent: "center",
+      alignItems: "center",
+      width: 80,
+    },
+    deleteSwipeText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+    saveBtn: {
+      marginTop: 20,
+      backgroundColor: palette.primary ?? "#00A652",
+      padding: 14,
+      borderRadius: 8,
+      alignItems: "center",
+    },
+    saveBtnText: { color: "#fff", fontWeight: "700" },
+  });

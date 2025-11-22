@@ -16,7 +16,8 @@ import {
   View,
 } from "react-native";
 import { useSession } from "../ctx";
-import colors from "./theme/colors";
+import colors from "./_theme/colors";
+const palette = colors.light;
 export default function LoginScreen() {
   const { signIn } = useSession();
   const router = useRouter();
@@ -28,9 +29,9 @@ export default function LoginScreen() {
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [bgLoaded, setBgLoaded] = useState(false); // ✅ track bg preload
+  const [bgLoaded, setBgLoaded] = useState(false); // ✅ track bg preloadS
 
-  const LOCAL_IP = "192.168.101.25";
+  const LOCAL_IP = "192.168.100.103";
 
   const API_URL =
     Platform.OS === "android"
@@ -111,7 +112,7 @@ export default function LoginScreen() {
   if (!bgLoaded) {
     return (
       <View style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={palette.primary} />
       </View>
     );
   }
@@ -215,7 +216,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 45,
     borderWidth: 1,
-    borderColor: colors.primary,
+    borderColor: palette.primary,
     borderRadius: 8,
     paddingHorizontal: 10,
     marginBottom: 15,
@@ -228,7 +229,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: colors.primary,
+    borderColor: palette.primary,
     borderRadius: 8,
     marginBottom: 15,
     paddingHorizontal: 10,
@@ -245,7 +246,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   showButtonText: {
-    color: colors.primary,
+    color: palette.primary,
     fontWeight: "600",
   },
   checkboxContainer: {
@@ -264,14 +265,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   checkboxChecked: {
-    backgroundColor: colors.primary,
+    backgroundColor: palette.primary,
   },
   checkboxLabel: {
     fontSize: 14,
     color: "#333",
   },
   loginButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: palette.primary,
     width: "100%",
     paddingVertical: 14,
     borderRadius: 8,

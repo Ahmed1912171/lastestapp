@@ -1,5 +1,5 @@
 import { Calendar, ClipboardCheck, FileText } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -14,9 +14,12 @@ import LeavesScreen from "../../components/leaves";
 import LeavesApproval from "../../components/LeavesApproval";
 import SimpleAvatar from "../../components/SimpleAvatar";
 import { useSession } from "../../ctx";
+import { useTheme } from "../../ctx/theme";
 
 export default function HRISScreen() {
   const { session } = useSession();
+  const { isDarkMode } = useTheme();
+  const styles = useMemo(() => createStyles(isDarkMode), [isDarkMode]);
   const [activeView, setActiveView] = useState<'menu' | 'attendance' | 'leaves' | 'approval'>('menu');
 
   const userName = session?.user?.GR_EMPLOYER_LOGIN?.split("-")[0] || "User";
@@ -126,81 +129,94 @@ export default function HRISScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#f3f4f6",
-  },
-  container: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 16,
-    paddingTop: 20,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "600",
-  },
-  subtitle: {
-    color: "#666",
-    fontSize: 14,
-    marginTop: 2,
-  },
-  pinText: {
-    color: "#999",
-    fontSize: 12,
-    marginTop: 4,
-  },
-  buttonsGrid: {
-    gap: 16,
-  },
-  leavesRow: {
-    flexDirection: "row",
-    gap: 16,
-  },
-  buttonCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 20,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-  },
-  halfWidthCard: {
-    flex: 1,
-  },
-  iconWrapper: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  buttonTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1a1a1a",
-    marginBottom: 6,
-  },
-  buttonSubtitle: {
-    fontSize: 14,
-    color: "#666",
-    textAlign: "center",
-  },
-});
+const createStyles = (isDarkMode: boolean) => {
+  const background = isDarkMode ? "#000000" : "#f3f4f6";
+  const card = isDarkMode ? "#0d0d0d" : "#fff";
+  const border = isDarkMode ? "#1a1a1a" : "#e5e7eb";
+  const textPrimary = isDarkMode ? "#f8fafc" : "#1a1a1a";
+  const textMuted = isDarkMode ? "#94a3b8" : "#666";
+  const pinColor = isDarkMode ? "#cbd5f5" : "#999";
+
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: background,
+    },
+    container: {
+      flex: 1,
+    },
+    contentContainer: {
+      padding: 16,
+      paddingTop: 20,
+    },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: 16,
+      backgroundColor: card,
+      borderBottomWidth: 1,
+      borderBottomColor: border,
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: "600",
+      color: textPrimary,
+    },
+    subtitle: {
+      color: textMuted,
+      fontSize: 14,
+      marginTop: 2,
+    },
+    pinText: {
+      color: pinColor,
+      fontSize: 12,
+      marginTop: 4,
+    },
+    buttonsGrid: {
+      gap: 16,
+      padding: 16,
+    },
+    leavesRow: {
+      flexDirection: "row",
+      gap: 16,
+    },
+    buttonCard: {
+      backgroundColor: card,
+      borderRadius: 12,
+      padding: 20,
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOpacity: isDarkMode ? 0.4 : 0.1,
+      shadowRadius: 5,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 3,
+      borderWidth: 1,
+      borderColor: border,
+    },
+    halfWidthCard: {
+      flex: 1,
+    },
+    iconWrapper: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    buttonTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: textPrimary,
+      marginBottom: 6,
+      textAlign: "center",
+      width: "100%",
+    },
+    buttonSubtitle: {
+      fontSize: 14,
+      color: textMuted,
+      textAlign: "center",
+    },
+  });
+};
