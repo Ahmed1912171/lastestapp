@@ -47,7 +47,7 @@ export default function SearchScreen() {
       setLoading(true);
       try {
         const res = await axios.get<Patient[]>(
-          "http://192.168.100.103:3000/search",
+          "http://192.168.100.162:3000/search",
           { params: { query, page: pageNumber, limit: 50 } }
         );
 

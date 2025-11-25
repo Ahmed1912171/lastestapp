@@ -1,4 +1,4 @@
-import { Calendar, ClipboardCheck, FileText } from "lucide-react-native";
+import { Calendar, ClipboardCheck, FileText, Users } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import {
   Alert,
@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import AttendanceScreen from "../../components/attendance";
 import LeavesScreen from "../../components/leaves";
 import LeavesApproval from "../../components/LeavesApproval";
+import TeamsAttendence from "../../components/TeamsAttendence";
 import SimpleAvatar from "../../components/SimpleAvatar";
 import { useSession } from "../../ctx";
 import { useTheme } from "../../ctx/theme";
@@ -20,7 +21,7 @@ export default function HRISScreen() {
   const { session } = useSession();
   const { isDarkMode } = useTheme();
   const styles = useMemo(() => createStyles(isDarkMode), [isDarkMode]);
-  const [activeView, setActiveView] = useState<'menu' | 'attendance' | 'leaves' | 'approval'>('menu');
+  const [activeView, setActiveView] = useState<'menu' | 'attendance' | 'leaves' | 'approval' | 'team-attendance'>('menu');
 
   const userName = session?.user?.GR_EMPLOYER_LOGIN?.split("-")[0] || "User";
   const pinNumber = session?.user?.pinNumber || (
@@ -41,6 +42,10 @@ export default function HRISScreen() {
 
   if (activeView === 'approval') {
     return <LeavesApproval onBack={() => setActiveView('menu')} />;
+  }
+
+  if (activeView === 'team-attendance') {
+    return <TeamsAttendence onBack={() => setActiveView('menu')} />;
   }
 
   return (
@@ -123,6 +128,31 @@ export default function HRISScreen() {
               </Text>
             </TouchableOpacity>
           </View>
+
+          {/* Team's Attendance Button - Full Width */}
+          <TouchableOpacity
+            style={[
+              styles.buttonCard,
+              !isManager && { opacity: 0.5 },
+            ]}
+            onPress={() => {
+              if (!isManager) {
+                Alert.alert("Restricted Access", "Only managers can view team attendance.");
+                return;
+              }
+              setActiveView('team-attendance');
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.iconWrapper, { backgroundColor: "#f3e8ff" }]}>
+              <Users size={32} color="#9333ea" />
+            </View>
+            <Text style={styles.buttonTitle}>Team's Attendance</Text>
+            <Text style={styles.buttonSubtitle}>
+              View and manage your team's attendance
+              {!isManager ? " (Restricted)" : ""}
+            </Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>

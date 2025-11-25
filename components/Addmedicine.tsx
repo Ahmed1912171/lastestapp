@@ -58,7 +58,7 @@ interface AddMedicineProps {
   patientId: string | number;
 }
 
-const API_BASE_URL = "http://192.168.100.103:3000";
+const API_BASE_URL = "http://192.168.100.162:3000";
 
 const FIELD_LABELS = {
   dosageCount: "Dosage Count*",
@@ -78,7 +78,7 @@ const DOSAGE_COUNTS = [
   { label: "HS", value: "HS" },
 ];
 
-const DAY_COUNTS = Array.from({ length: 30 }, (_, i) => ({
+const DAY_COUNTS = Array.from({ length: 7 }, (_, i) => ({
   label: `${i + 1}`,
   value: `${i + 1}`,
 }));
@@ -175,7 +175,7 @@ const AddMedicine: React.FC<AddMedicineProps> = ({ closeModal, patientId }) => {
   const toggleDropdown = (index: number, field: OpenField, open?: boolean) => {
     setEntries((prev) =>
       prev.map((entry, i) => {
-        if (i !== index) return entry;
+        // Close all dropdowns in all entries first
         const closedAll = {
           ...entry,
           openDosageCount: false,
@@ -184,7 +184,10 @@ const AddMedicine: React.FC<AddMedicineProps> = ({ closeModal, patientId }) => {
           openDay: false,
           openWardDosage: false,
         };
-        closedAll[field] = typeof open === "boolean" ? open : !entry[field];
+        // Then open the specific dropdown in the target entry
+        if (i === index) {
+          closedAll[field] = typeof open === "boolean" ? open : !entry[field];
+        }
         return closedAll;
       })
     );
@@ -192,20 +195,27 @@ const AddMedicine: React.FC<AddMedicineProps> = ({ closeModal, patientId }) => {
 
   const onSelect = (index: number, field: ValueField, value: string) => {
     setEntries((prev) =>
-      prev.map((entry, i) =>
-        i === index
-          ? {
-              ...entry,
-              [field]: value,
-              openDosageCount: false,
-              openMedicine: false,
-              openDosage: false,
-              openDay: false,
-              openWardDosage: false,
-              errors: { ...entry.errors, [field]: false },
-            }
-          : entry
-      )
+      prev.map((entry, i) => {
+        if (i !== index) return entry;
+        
+        const updatedEntry = {
+          ...entry,
+          [field]: value,
+          openDosageCount: false,
+          openMedicine: false,
+          openDosage: false,
+          openDay: false,
+          openWardDosage: false,
+          errors: { ...entry.errors, [field]: false },
+        };
+        
+        // If dosage count is "Stat", set day count to "0"
+        if (field === "dosageCount" && value === "Stat") {
+          updatedEntry.dayCount = "0";
+        }
+        
+        return updatedEntry;
+      })
     );
   };
 
@@ -248,7 +258,8 @@ const AddMedicine: React.FC<AddMedicineProps> = ({ closeModal, patientId }) => {
         ((errors.wardDosage = true), (hasError = true));
       if (!entry.medicineName?.trim())
         ((errors.medicineName = true), (hasError = true));
-      if (!entry.dayCount?.trim())
+      // Only require day count if dosage is not "Stat"
+      if (entry.dosageCount !== "Stat" && !entry.dayCount?.trim())
         ((errors.dayCount = true), (hasError = true));
       return { ...entry, errors };
     });
@@ -263,7 +274,7 @@ const AddMedicine: React.FC<AddMedicineProps> = ({ closeModal, patientId }) => {
           SUB_ITEM_CAT_ID: entry.medicineName,
           Dosage: entry.dosageCount,
           ward_dosage: entry.wardDosage,
-          day_count: entry.dayCount,
+          day_count: entry.dosageCount === "Stat" ? "0" : (entry.dayCount || ""),
           dosagetype: entry.dosageType || "Normal",
           remarks: entry.remarks,
           diagnosis: entry.diagnosis || "",
@@ -322,10 +333,7 @@ const AddMedicine: React.FC<AddMedicineProps> = ({ closeModal, patientId }) => {
               {entries.map((entry, idx) => (
                 <View
                   key={idx}
-                  style={[
-                    styles.entryContainer,
-                    { zIndex: 1000 - idx, position: "relative" },
-                  ]}
+                  style={styles.entryContainer}
                 >
                   <Text style={styles.entryTitle}># {idx + 1}</Text>
 
@@ -338,42 +346,72 @@ const AddMedicine: React.FC<AddMedicineProps> = ({ closeModal, patientId }) => {
                   <Text style={styles.fieldLabel}>
                     {FIELD_LABELS.medicineName}
                   </Text>
-                  <DropDownPicker
-                    open={entry.openMedicine}
-                    value={entry.medicineName || ""}
-                    items={medicineList}
-                    loading={loadingMedicines}
-                    searchable
-                    searchPlaceholder="Search medicine..."
-                    onChangeSearchText={(t) => fetchMedicines(t)}
-                    setOpen={makeSetOpenHandler(idx, "openMedicine")}
-                    setValue={makeSetValueHandler(idx, "medicineName")}
-                    placeholder="Select Medicine"
-                    listMode="SCROLLVIEW"
-                    style={[
-                      styles.dropdown,
-                      entry.errors?.medicineName && styles.errorBorder,
-                    ]}
-                    dropDownContainerStyle={{ zIndex: 10000, elevation: 10 }}
-                  />
+                  <View style={{ zIndex: 5000 + idx * 1000 + 1, elevation: 5 }}>
+                    <DropDownPicker
+                      open={entry.openMedicine}
+                      value={entry.medicineName || ""}
+                      items={medicineList}
+                      loading={loadingMedicines}
+                      searchable
+                      searchPlaceholder="Search medicine..."
+                      onChangeSearchText={(t) => fetchMedicines(t)}
+                      setOpen={makeSetOpenHandler(idx, "openMedicine")}
+                      setValue={makeSetValueHandler(idx, "medicineName")}
+                      placeholder="Select Medicine"
+                      listMode="SCROLLVIEW"
+                      dropDownDirection="BOTTOM"
+                      maxHeight={200}
+                      containerProps={{
+                        style: {
+                          height: entry.openMedicine ? 250 : null,
+                          zIndex: 5000 + idx * 1000 + 1,
+                        },
+                      }}
+                      style={[
+                        styles.dropdown,
+                        entry.errors?.medicineName && styles.errorBorder,
+                      ]}
+                      dropDownContainerStyle={{
+                        zIndex: 5000 + idx * 1000 + 1,
+                        elevation: 25,
+                        maxHeight: 200,
+                      }}
+                      zIndex={5000 + idx * 1000 + 1}
+                    />
+                  </View>
 
                   <Text style={styles.fieldLabel}>
                     {FIELD_LABELS.dosageCount}
                   </Text>
-                  <DropDownPicker
-                    open={entry.openDosageCount}
-                    value={entry.dosageCount || ""}
-                    items={DOSAGE_COUNTS}
-                    setOpen={makeSetOpenHandler(idx, "openDosageCount")}
-                    setValue={makeSetValueHandler(idx, "dosageCount")}
-                    placeholder="Dosage Count"
-                    listMode="SCROLLVIEW"
-                    style={[
-                      styles.dropdown,
-                      entry.errors?.dosageCount && styles.errorBorder,
-                    ]}
-                    dropDownContainerStyle={{ zIndex: 10000, elevation: 10 }}
-                  />
+                  <View style={{ zIndex: 5000 + idx * 1000 + 10, elevation: 5 }}>
+                    <DropDownPicker
+                      open={entry.openDosageCount}
+                      value={entry.dosageCount || ""}
+                      items={DOSAGE_COUNTS}
+                      setOpen={makeSetOpenHandler(idx, "openDosageCount")}
+                      setValue={makeSetValueHandler(idx, "dosageCount")}
+                      placeholder="Dosage Count"
+                      listMode="SCROLLVIEW"
+                      dropDownDirection="BOTTOM"
+                      maxHeight={150}
+                      containerProps={{
+                        style: {
+                          height: entry.openDosageCount ? 200 : null,
+                          zIndex: 5000 + idx * 1000 + 10,
+                        },
+                      }}
+                      style={[
+                        styles.dropdown,
+                        entry.errors?.dosageCount && styles.errorBorder,
+                      ]}
+                      dropDownContainerStyle={{
+                        zIndex: 5000 + idx * 1000 + 10,
+                        elevation: 25,
+                        maxHeight: 150,
+                      }}
+                      zIndex={5000 + idx * 1000 + 10}
+                    />
+                  </View>
 
                   <Text style={styles.fieldLabel}>
                     {FIELD_LABELS.wardDosage}
@@ -389,20 +427,38 @@ const AddMedicine: React.FC<AddMedicineProps> = ({ closeModal, patientId }) => {
                   />
 
                   <Text style={styles.fieldLabel}>{FIELD_LABELS.dayCount}</Text>
-                  <DropDownPicker
-                    open={entry.openDay}
-                    value={entry.dayCount || ""}
-                    items={DAY_COUNTS}
-                    setOpen={makeSetOpenHandler(idx, "openDay")}
-                    setValue={makeSetValueHandler(idx, "dayCount")}
-                    placeholder="Day Count"
-                    listMode="SCROLLVIEW"
-                    style={[
-                      styles.dropdown,
-                      entry.errors?.dayCount && styles.errorBorder,
-                    ]}
-                    dropDownContainerStyle={{ zIndex: 10000, elevation: 10 }}
-                  />
+                  <View style={{ zIndex: 5000 + idx * 1000 + 20, elevation: 5 }}>
+                    <DropDownPicker
+                      open={entry.openDay}
+                      value={entry.dayCount === "0" ? "" : (entry.dayCount || "")}
+                      items={DAY_COUNTS}
+                      setOpen={makeSetOpenHandler(idx, "openDay")}
+                      setValue={makeSetValueHandler(idx, "dayCount")}
+                      placeholder="Day Count"
+                      disabled={entry.dosageCount === "Stat"}
+                      listMode="SCROLLVIEW"
+                      dropDownDirection="BOTTOM"
+                      maxHeight={150}
+                      containerProps={{
+                        style: {
+                          height: entry.openDay ? 200 : null,
+                          zIndex: 5000 + idx * 1000 + 20,
+                          opacity: entry.dosageCount === "Stat" ? 0.5 : 1,
+                        },
+                      }}
+                      style={[
+                        styles.dropdown,
+                        entry.errors?.dayCount && styles.errorBorder,
+                        entry.dosageCount === "Stat" && { opacity: 0.5 },
+                      ]}
+                      dropDownContainerStyle={{
+                        zIndex: 5000 + idx * 1000 + 20,
+                        elevation: 25,
+                        maxHeight: 150,
+                      }}
+                      zIndex={5000 + idx * 1000 + 20}
+                    />
+                  </View>
 
                   <Text style={styles.fieldLabel}>{FIELD_LABELS.remarks}</Text>
                   <TextInput

@@ -58,7 +58,7 @@ export default function PatientDetailScreen() {
   );
   const [notes, setNotes] = useState<Note[]>([]);
   const [radiologyReports, setRadiologyReports] = useState<Radiology[]>([]);
-  const LOCAL_IP = "192.168.100.103";
+  const LOCAL_IP = "192.168.100.162";
   const { isDarkMode } = useTheme();
   const palette = useMemo(() => buildDetailPalette(isDarkMode), [isDarkMode]);
   const styles = useMemo(() => createStyles(palette), [palette]);

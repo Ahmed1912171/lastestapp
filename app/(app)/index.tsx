@@ -2,26 +2,25 @@
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import {
-    Activity,
-    Bed,
-    BedSingle,
-    Bell,
-    Hospital,
-    TestTubes,
-    TrendingUp,
-    Users,
-    Warehouse,
+  Bed,
+  BedSingle,
+  Bell,
+  Hospital,
+  TestTubes,
+  TrendingUp,
+  Users,
+  Warehouse
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    RefreshControl,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -36,6 +35,7 @@ type WardData = {
   ward_id: number;
   ward_name: string;
   status: number;
+  patient_count?: number;
 };
 
 type BranchWards = Record<
@@ -74,7 +74,7 @@ export default function Dashboard() {
   const [testCount, setTestCount] = useState<number | null>(null);
   const [loadingCount, setLoadingCount] = useState(false);
 
-  const LOCAL_IP = "192.168.100.103";
+  const LOCAL_IP = "192.168.100.162";
 
   // ---------- Dynamic Date ----------
   useEffect(() => {
@@ -176,6 +176,14 @@ export default function Dashboard() {
           { name: "Sun", patients: Math.floor(Math.random() * 50) },
         ];
 
+        // ✅ First, collect patient counts per ward
+        const wardPatientCounts = new Map<string, number>();
+        data.forEach((ward) => {
+          if (ward.patient_count !== undefined) {
+            wardPatientCounts.set(ward.ward_name, ward.patient_count);
+          }
+        });
+
         data.forEach((ward) => {
           if (!newBranchWards[ward.ward_name]) {
             newBranchWards[ward.ward_name] = {
@@ -183,7 +191,7 @@ export default function Dashboard() {
               stats: {
                 total: 0,
                 occupied: 0,
-                currentPatients: 0,
+                currentPatients: wardPatientCounts.get(ward.ward_name) || 0, // ✅ Set actual patient count
                 totalTreated: 0,
               },
             };
@@ -192,7 +200,6 @@ export default function Dashboard() {
           newBranchWards[ward.ward_name].stats.total += 1;
           if (ward.status === 1) {
             newBranchWards[ward.ward_name].stats.occupied += 1;
-            newBranchWards[ward.ward_name].stats.currentPatients += 1;
           }
         });
 
@@ -444,23 +451,6 @@ export default function Dashboard() {
                 <Text style={styles.statLabel}>Current Patients</Text>
                 <Text style={styles.statValue}>
                   {wardData.stats.currentPatients}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Total Treated */}
-          <View style={styles.statCard}>
-            <View style={styles.statRow}>
-              <View
-                style={[styles.iconWrapper, { backgroundColor: "#6b9e7fff" }]}
-              >
-                <Activity size={20} color="#000000ff" />
-              </View>
-              <View>
-                <Text style={styles.statLabel}>Total Treated</Text>
-                <Text style={styles.statValue}>
-                  {wardData.stats.totalTreated}
                 </Text>
               </View>
             </View>

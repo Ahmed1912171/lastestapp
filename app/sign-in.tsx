@@ -3,17 +3,17 @@ import { Asset } from "expo-asset"; // ✅ for preloading
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Image,
-  ImageBackground,
-  Keyboard,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+    ActivityIndicator,
+    Image,
+    ImageBackground,
+    Keyboard,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
 } from "react-native";
 import { useSession } from "../ctx";
 import colors from "./_theme/colors";
@@ -22,7 +22,7 @@ export default function LoginScreen() {
   const { signIn } = useSession();
   const router = useRouter();
 
-
+// 100225-51149	 sajjan id
 //  const [username, setUsername] = useState("120822-0007"); dr shahid raza
   const [username, setUsername] = useState("010723-0242");
   const [password, setPassword] = useState("Sichn"); // ✅ Master password required for all users
@@ -31,7 +31,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [bgLoaded, setBgLoaded] = useState(false); // ✅ track bg preloadS
 
-  const LOCAL_IP = "192.168.100.103";
+  const LOCAL_IP = "192.168.100.162";
 
   const API_URL =
     Platform.OS === "android"

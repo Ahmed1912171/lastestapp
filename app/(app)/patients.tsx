@@ -4,7 +4,7 @@ import NewTestRegistration from "@/components/NewTestRegistration";
 import PharmacyTable from "@/components/PharmacyTable";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
-import { Bot, ClipboardList, FileText, Send } from "lucide-react-native";
+import { Bot, FileText, Send } from "lucide-react-native";
 import React, {
     ReactNode,
     useCallback,
@@ -32,10 +32,11 @@ import DropDownPicker from "react-native-dropdown-picker";
 import Modal from "react-native-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
+import { useSession } from "../../ctx";
 import { useTheme } from "../../ctx/theme";
 
-import Results from "@/components/Results";
 import {
+    Bed,
     Pill,
     PlusCircle,
     ScanText,
@@ -51,7 +52,6 @@ const TAB_ICONS: Record<
   radiology: ScanText,
   pharmacy: Pill,
   newtest: PlusCircle,
-  results: ClipboardList,
 };
 
 const avatarImg = require("../images/avatar.png");
@@ -106,13 +106,13 @@ const TABS = [
   "radiology",
   "pharmacy",
   "newtest",
-  "results",
 ] as const;
 
 type TabType = (typeof TABS)[number];
 
 export default function PatientsScreen() {
   const { isDarkMode } = useTheme();
+  const { session } = useSession();
   // ---------- data + UI state ----------
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(false); // initial page loader
@@ -132,6 +132,7 @@ export default function PatientsScreen() {
   const [messageText, setMessageText] = useState("");
   const [aiModalVisible, setAiModalVisible] = useState(false);
   const [aiPatientId, setAiPatientId] = useState<number | null>(null);
+  const [bedAssignments, setBedAssignments] = useState<Record<number, number>>({}); // patientId -> WD_BED_ID
   const styles = useMemo(() => createStyles(isDarkMode), [isDarkMode]);
   const textColor = isDarkMode ? "#f8fafc" : "#111827";
   const mutedColor = isDarkMode ? "#a1a1aa" : "#666";
@@ -140,7 +141,7 @@ export default function PatientsScreen() {
   const borderColor = isDarkMode ? "#1f2937" : "#ccc";
 
   // ---------- network / config ----------
-  const LOCAL_IP = "192.168.100.103";
+  const LOCAL_IP = "192.168.100.162";
   const API_BASE =
     Platform.OS === "android"
       ? "http://10.0.2.2:3000"
@@ -287,6 +288,38 @@ export default function PatientsScreen() {
           });
         }
 
+        // Fetch bed assignments for all patients
+        const bedPromises = data.map(async (patient) => {
+          try {
+            const bedRes = await axios.get(`${API_BASE}/ward_bed_assign`, {
+              params: {
+                patientId: patient.PATIENT_ID,
+                branch: branch.toLowerCase(),
+              },
+            });
+            if (bedRes.data.found && bedRes.data.bedAssignment?.WD_BED_ID) {
+              return {
+                patientId: patient.PATIENT_ID,
+                bedId: bedRes.data.bedAssignment.WD_BED_ID,
+              };
+            }
+            return null;
+          } catch (err) {
+            console.error(`Error fetching bed for patient ${patient.PATIENT_ID}:`, err);
+            return null;
+          }
+        });
+
+        const bedResults = await Promise.all(bedPromises);
+        const newBedAssignments: Record<number, number> = {};
+        bedResults.forEach((result) => {
+          if (result) {
+            newBedAssignments[result.patientId] = result.bedId;
+          }
+        });
+
+        setBedAssignments((prev) => ({ ...prev, ...newBedAssignments }));
+
         setPage(respPage);
         setHasMore(respHasMore);
       } catch (err) {
@@ -368,15 +401,25 @@ export default function PatientsScreen() {
   const handleSend = async () => {
     if (!messageText.trim() || !selectedPatient) return;
     try {
+      // Get creator name from session
+      const firstName = session?.user?.ADMIN_FIRST_NAME || "";
+      const lastName = session?.user?.ADMIN_LAST_NAME || "";
+      const creatorName = [firstName, lastName].filter(Boolean).join(" ");
+      
+      // Append creator name to note text
+      const noteWithCreator = creatorName 
+        ? `${messageText.trim()} - ${creatorName}`
+        : messageText.trim();
+
       const res = await axios.post(
         `${API_BASE}/patients/${selectedPatient.PATIENT_ID}/notes`,
         {
-          LocalExamination: messageText.trim(),
+          LocalExamination: noteWithCreator,
         }
       );
       const newNote: Note = {
         Loc_ID: res.data.insertId || Date.now(),
-        LocalExamination: messageText.trim(),
+        LocalExamination: noteWithCreator,
         loc_ex_date: new Date().toISOString(),
         created_at: undefined,
       };
@@ -496,9 +539,7 @@ export default function PatientsScreen() {
                           ? "Pharmacy"
                           : tab === "newtest"
                             ? "New Test"
-                            : tab === "results"
-                              ? "Results"
-                              : ""}
+                            : ""}
                 </Text>
               </TouchableOpacity>
             );
@@ -605,16 +646,6 @@ export default function PatientsScreen() {
                 gender: selectedPatient.GENDER,
               }}
               branch={branch}
-            />
-          )}
-
-          {activeTab === "results" && selectedPatient && (
-            <Results
-              tests={["Hemoglobin", "WBC", "Platelets"]}
-              onSave={(values) => {
-                console.log("Saved Values:", values);
-                // TODO: call API here later
-              }}
             />
           )}
         </View>
@@ -735,9 +766,19 @@ export default function PatientsScreen() {
                   <Text style={{ fontSize: 12, color: mutedColor }}>
                     MR: {item.PMR_NO}
                   </Text>
-                  <Text style={{ fontSize: 12, color: mutedColor }}>
-                    ID: {item.PATIENT_ID}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Text style={{ fontSize: 12, color: mutedColor }}>
+                      ID: {item.PATIENT_ID}
+                    </Text>
+                    {bedAssignments[item.PATIENT_ID] && (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginLeft: 4 }}>
+                        <Bed size={12} color={mutedColor} />
+                        <Text style={{ fontSize: 12, color: mutedColor }}>
+                          Bed: {bedAssignments[item.PATIENT_ID]}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
               </View>
 
@@ -763,9 +804,7 @@ export default function PatientsScreen() {
                                 ? "Pharmacy"
                                 : tab === "newtest"
                                   ? "New Test"
-                                  : tab === "results"
-                                    ? "Results"
-                                    : ""}
+                                  : ""}
                       </Text>
                     </TouchableOpacity>
                   );

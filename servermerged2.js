@@ -169,6 +169,72 @@ app.get(
   })
 );
 
+// ==========================
+// 👥 GET EMPLOYEES FOR MANAGER
+// ==========================
+app.get(
+  "/employees/team",
+  safeHandler(async (req, res) => {
+    // ✅ Always use korangi (central) database for eis_personal_information
+    // This table is not branch-specific - it contains all employees
+    const db = await getDb("korangi");
+    const managerPin = req.query.managerPin || req.query.manager_id;
+    
+    if (!managerPin) {
+      return res.status(400).json({ error: "managerPin is required" });
+    }
+    
+    const managerPinInt = normalizePinNumber(managerPin);
+    if (!managerPinInt) {
+      return res.status(400).json({ error: "Invalid managerPin format" });
+    }
+    
+    // Get employees from eis_personal_information where manager_id matches the provided managerPin
+    // This is not branch-dependent - shows employees under this specific manager only
+    const [employees] = await db.query(
+      `SELECT 
+        epi.EIS_EMPLOYEE_CODE,
+        epi.EIS_EMPLOYEE_NAME,
+        epi.manager_id,
+        epi.empid,
+        a.ADMIN_ID,
+        a.GR_EMPLOYER_LOGIN
+      FROM eis_personal_information epi
+      LEFT JOIN admin a ON a.GR_EMPLOYER_LOGIN = epi.EIS_EMPLOYEE_CODE
+      WHERE epi.manager_id = ?
+      ORDER BY epi.EIS_EMPLOYEE_NAME`,
+      [managerPinInt]
+    );
+    
+    // Extract PIN numbers from GR_EMPLOYER_LOGIN
+    const extractPinFromValue = (value) => {
+      if (!value || typeof value !== "string") return null;
+      const segment = value.includes("-") ? value.split("-").pop() : value;
+      const digits = segment.replace(/\D/g, "");
+      if (!digits) return null;
+      const parsed = parseInt(digits, 10);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
+    const employeesWithPin = employees.map((emp) => {
+      let pinNumber =
+        extractPinFromValue(emp.GR_EMPLOYER_LOGIN) ??
+        extractPinFromValue(emp.EIS_EMPLOYEE_CODE);
+
+      if (!pinNumber && Number.isFinite(emp.empid)) {
+        pinNumber = parseInt(emp.empid, 10);
+      }
+
+      return {
+        ...emp,
+        pinNumber: Number.isFinite(pinNumber) ? pinNumber : null,
+      };
+    });
+    
+    res.json(employeesWithPin);
+  })
+);
+
 app.post(
   "/login",
   safeHandler(async (req, res) => {
@@ -568,18 +634,84 @@ app.get(
        WHERE WARD_ID IN (${wardIds.join(",")})`
     );
 
-    // 4️⃣ Merge data: attach bed statuses to ward names
+    // 4️⃣ Get actual patient count from adm_requests for each ward
+    const [patientCounts] = await db.query(
+      `SELECT 
+        ar.WARD_ID,
+        COUNT(*) AS patient_count
+      FROM adm_requests ar
+      WHERE ar.STATUS = 1
+        AND ar.WARD_ID IN (${wardIds.join(",")})
+      GROUP BY ar.WARD_ID`
+    );
+
+    // Create a map of WARD_ID -> patient_count
+    const patientCountMap = new Map();
+    patientCounts.forEach((pc) => {
+      patientCountMap.set(pc.WARD_ID, pc.patient_count);
+    });
+
+    // 5️⃣ Merge data: attach bed statuses to ward names + patient count
     const data = beds.map((b) => {
       const ward = wards.find((w) => w.WARD_ID === b.WARD_ID);
       return {
         ward_id: b.WARD_ID,
         ward_name: ward ? ward.WARD_NAME : "Unknown",
         status: b.WD_OCC_STATUS,
+        patient_count: patientCountMap.get(b.WARD_ID) || 0, // Actual patient count
       };
     });
 
-    // 5️⃣ Return final JSON
+    // 6️⃣ Return final JSON
     res.json(data);
+  })
+);
+
+// ==========================
+// 🔹 WARD BED ASSIGNMENT (Get Bed ID by Patient ID)
+// ==========================
+app.get(
+  "/ward_bed_assign",
+  safeHandler(async (req, res) => {
+    const branch = req.query.branch || "korangi";
+    const patientId = req.query.patientId || req.query.PATIENT_ID;
+    const db = await getDb(branch);
+
+    if (!patientId) {
+      return res.status(400).json({ error: "patientId is required" });
+    }
+
+    const [results] = await db.query(
+      `SELECT 
+        WD_ASSIGN_ID,
+        WD_BED_ID,
+        WARD_ID,
+        PATIENT_ID,
+        DATE_FORMAT(ASSIGN_DATE, '%Y-%m-%d') AS ASSIGN_DATE,
+        ACTIVE,
+        DATE_FORMAT(DEP_DATE, '%Y-%m-%d') AS DEP_DATE,
+        ASSIGN_BY,
+        UPDATE_BY,
+        ADM_REQ_ID,
+        DATE_FORMAT(UPDATE_AT, '%Y-%m-%d %H:%i:%s') AS UPDATE_AT
+      FROM ward_bed_assign
+      WHERE PATIENT_ID = ? AND ACTIVE = 1
+      ORDER BY ASSIGN_DATE DESC
+      LIMIT 1`,
+      [patientId]
+    );
+
+    if (results.length === 0) {
+      return res.json({ 
+        found: false, 
+        message: "No active bed assignment found for this patient" 
+      });
+    }
+
+    res.json({
+      found: true,
+      bedAssignment: results[0]
+    });
   })
 );
 
@@ -2520,6 +2652,45 @@ app.get(
       checkIns: records.filter(r => r.Status === 1).length,
       checkOuts: records.filter(r => r.Status === 2).length
     });
+  })
+);
+
+// ==========================
+// 🚨 VIOLATION DETECTION
+// ==========================
+app.get(
+  "/violation",
+  safeHandler(async (req, res) => {
+    const branch = req.query.branch || "korangi";
+    const db = await getDb(branch);
+
+    // ✅ Find records where same PinNumber has different DeviceName or IMEI
+    const [results] = await db.query(
+      `SELECT 
+        a1.AttendanceID,
+        a1.PinNumber,
+        a1.DeviceName,
+        a1.IMEI,
+        DATE_FORMAT(a1.AttendanceDate, '%Y-%m-%d') AS AttendanceDate,
+        a1.AttendanceTime,
+        a1.Status,
+        COUNT(DISTINCT a2.DeviceName) as device_count,
+        COUNT(DISTINCT a2.IMEI) as imei_count
+      FROM as_attendance a1
+      INNER JOIN as_attendance a2 
+        ON a1.PinNumber = a2.PinNumber 
+        AND a1.AttendanceDate = a2.AttendanceDate
+        AND (a1.DeviceName != a2.DeviceName OR a1.IMEI != a2.IMEI)
+      WHERE a1.DeviceName IS NOT NULL 
+        AND a1.IMEI IS NOT NULL
+        AND a1.DeviceName != ''
+        AND a1.IMEI != ''
+      GROUP BY a1.AttendanceID, a1.PinNumber, a1.DeviceName, a1.IMEI, a1.AttendanceDate, a1.AttendanceTime, a1.Status
+      ORDER BY a1.AttendanceDate DESC, a1.PinNumber
+      LIMIT 500`
+    );
+
+    res.json(results);
   })
 );
 
