@@ -50,7 +50,7 @@ export default function Notifications({ visible, onClose, onCountChange }: Notif
   const [loading, setLoading] = React.useState(false);
   const styles = React.useMemo(() => createStyles(palette, isDarkMode), [palette, isDarkMode]);
 
-  const LOCAL_IP = "192.168.100.162";
+  const LOCAL_IP = "192.168.100.134";
   const API_BASE =
     Platform.OS === "android" ? "http://10.0.2.2:3000" : `http://${LOCAL_IP}:3000`;
 

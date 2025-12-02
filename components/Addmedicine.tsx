@@ -58,7 +58,7 @@ interface AddMedicineProps {
   patientId: string | number;
 }
 
-const API_BASE_URL = "http://192.168.100.162:3000";
+const API_BASE_URL = "http://192.168.100.134:3000";
 
 const FIELD_LABELS = {
   dosageCount: "Dosage Count*",

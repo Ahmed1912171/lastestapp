@@ -92,7 +92,7 @@ export default function TeamsAttendence({ onBack }: TeamsAttendenceProps) {
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   });
 
-  const LOCAL_IP = "192.168.100.162";
+  const LOCAL_IP = "192.168.100.134";
   const API_BASE =
     Platform.OS === "android" ? "http://10.0.2.2:3000" : `http://${LOCAL_IP}:3000`;
 

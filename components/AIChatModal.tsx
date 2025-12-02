@@ -28,7 +28,7 @@ interface Props {
   patientId?: number | null;
 }
 
-const BACKEND_BASE = "http://192.168.100.162:3000";
+const BACKEND_BASE = "http://192.168.100.134:3000";
 
 type ThemePalette = ReturnType<typeof useTheme>["palette"];
 

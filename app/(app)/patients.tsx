@@ -141,7 +141,7 @@ export default function PatientsScreen() {
   const borderColor = isDarkMode ? "#1f2937" : "#ccc";
 
   // ---------- network / config ----------
-  const LOCAL_IP = "192.168.100.162";
+  const LOCAL_IP = "192.168.100.134";
   const API_BASE =
     Platform.OS === "android"
       ? "http://10.0.2.2:3000"

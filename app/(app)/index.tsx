@@ -74,7 +74,7 @@ export default function Dashboard() {
   const [testCount, setTestCount] = useState<number | null>(null);
   const [loadingCount, setLoadingCount] = useState(false);
 
-  const LOCAL_IP = "192.168.100.162";
+  const LOCAL_IP = "192.168.100.134";
 
   // ---------- Dynamic Date ----------
   useEffect(() => {
