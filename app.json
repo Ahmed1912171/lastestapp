@@ -39,6 +39,21 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#00A652",
+          "defaultChannel": "default",
+          "sounds": [
+            "./assets/sounds/ting.wav",
+            "./assets/sounds/notification.wav",
+            "./assets/sounds/alert.wav",
+            "./assets/sounds/success.wav",
+            "./assets/sounds/message.wav"
+          ]
+        }
       ]
     ],
     "experiments": {

@@ -1,6 +1,7 @@
 import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import React from "react";
 import {
+  Alert,
   StyleSheet,
   Switch,
   Text,
@@ -11,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import SimpleAvatar from "../../components/SimpleAvatar";
 import { useSession } from "../../ctx";
 import { useTheme } from "../../ctx/theme"; // ✅ global theme hook
+import { scheduleLocalNotification } from "../../services/notifications";
 
 export default function Profile() {
   const { isDarkMode, toggleDarkMode } = useTheme();
@@ -38,6 +40,21 @@ export default function Profile() {
     ? `ID: ${session.user.ADMIN_ID}`
     : "ID: ----";
 
+  const handleTestNotification = async () => {
+    try {
+      await scheduleLocalNotification(
+        "Test Notification",
+        "This is a test notification from your profile!",
+        { type: "test", timestamp: Date.now() },
+        2,
+        'ting.wav' // Custom "ting" bell sound
+      );
+      Alert.alert("Success", "Test notification scheduled! It will appear in 2 seconds.");
+    } catch (error) {
+      Alert.alert("Error", "Failed to schedule notification. Make sure you're on a physical device.");
+    }
+  };
+
   return (
     <SafeAreaView
       style={[
@@ -48,16 +65,34 @@ export default function Profile() {
       <View style={styles.container}>
         {/* Profile Header */}
         <View style={styles.profileHeader}>
-          <SimpleAvatar
-            fallback={displayName
-              .replace("Dr. ", "")
-              .split(" ")
-              .filter(Boolean)
-              .map((n) => n[0])
-              .join("")
-              .slice(0, 2)}
-            size={90}
-          />
+          <View style={styles.headerRow}>
+            <View style={styles.avatarContainer}>
+              <SimpleAvatar
+                fallback={displayName
+                  .replace("Dr. ", "")
+                  .split(" ")
+                  .filter(Boolean)
+                  .map((n) => n[0])
+                  .join("")
+                  .slice(0, 2)}
+                size={90}
+              />
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.testNotificationButton,
+                { backgroundColor: isDarkMode ? "#1f1f1f" : "#e5e7eb" },
+              ]}
+              onPress={handleTestNotification}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name="notifications-outline"
+                size={20}
+                color={isDarkMode ? "#00A652" : "#00A652"}
+              />
+            </TouchableOpacity>
+          </View>
           <Text style={[styles.name, { color: isDarkMode ? "#fff" : "#111" }]}>
             {displayName}
           </Text>
@@ -133,6 +168,28 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   container: { flex: 1, padding: 20 },
   profileHeader: { alignItems: "center", marginVertical: 24 },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    position: "relative",
+  },
+  avatarContainer: {
+    alignItems: "center",
+  },
+  testNotificationButton: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#00A652",
+  },
   name: { fontSize: 26, fontWeight: "700", marginTop: 12 },
 
   infoContainer: {

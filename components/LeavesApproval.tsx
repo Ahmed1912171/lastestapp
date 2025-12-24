@@ -55,7 +55,7 @@ export default function LeavesApproval({ onBack }: LeavesApprovalProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [actionId, setActionId] = useState<number | null>(null);
 
-  const LOCAL_IP = "192.168.100.134";
+  const LOCAL_IP = "192.168.101.39";
   const API_BASE =
     Platform.OS === "android" ? "http://10.0.2.2:3000" : `http://${LOCAL_IP}:3000`;
 

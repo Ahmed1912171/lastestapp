@@ -2,25 +2,25 @@
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import {
-  Bed,
-  BedSingle,
-  Bell,
-  Hospital,
-  TestTubes,
-  TrendingUp,
-  Users,
-  Warehouse
+    Bed,
+    BedSingle,
+    Bell,
+    Hospital,
+    TestTubes,
+    TrendingUp,
+    Users,
+    Warehouse
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -30,6 +30,7 @@ import SimpleAvatar from "../../components/SimpleAvatar";
 import SimpleChart from "../../components/SimpleChart";
 import { useSession } from "../../ctx";
 import { useTheme } from "../../ctx/theme";
+import { usePushNotifications } from "../../hooks/usePushNotifications";
 
 type WardData = {
   ward_id: number;
@@ -56,6 +57,7 @@ type BranchData = Record<string, BranchWards>;
 export default function Dashboard() {
   const { session } = useSession();
   const { isDarkMode } = useTheme();
+  const { expoPushToken } = usePushNotifications(); // Register for push notifications
   const [branchOpen, setBranchOpen] = useState(false);
   const [wardOpen, setWardOpen] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState<string>("");
@@ -70,11 +72,24 @@ export default function Dashboard() {
   const [notificationCount, setNotificationCount] = useState(0);
   const styles = useMemo(() => createStyles(isDarkMode), [isDarkMode]);
 
+  // Log push token when available (you can send this to your backend)
+  useEffect(() => {
+    if (expoPushToken) {
+      console.log("📱 Push Token available:", expoPushToken);
+      // TODO: Send token to your backend API
+      // Example:
+      // axios.post(`${API_BASE}/users/push-token`, {
+      //   userId: session?.user?.id,
+      //   pushToken: expoPushToken,
+      // });
+    }
+  }, [expoPushToken]);
+
   // ✅ Total Tests state
   const [testCount, setTestCount] = useState<number | null>(null);
   const [loadingCount, setLoadingCount] = useState(false);
 
-  const LOCAL_IP = "192.168.100.134";
+  const LOCAL_IP = "192.168.101.39";
 
   // ---------- Dynamic Date ----------
   useEffect(() => {

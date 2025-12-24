@@ -6,27 +6,27 @@ import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import { Bot, FileText, Send } from "lucide-react-native";
 import React, {
-    ReactNode,
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import {
-    ActivityIndicator,
-    Dimensions,
-    FlatList,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
 import Modal from "react-native-modal";
@@ -36,11 +36,11 @@ import { useSession } from "../../ctx";
 import { useTheme } from "../../ctx/theme";
 
 import {
-    Bed,
-    Pill,
-    PlusCircle,
-    ScanText,
-    TestTubeDiagonal,
+  Bed,
+  Pill,
+  PlusCircle,
+  ScanText,
+  TestTubeDiagonal,
 } from "lucide-react-native";
 
 const TAB_ICONS: Record<
@@ -141,7 +141,7 @@ export default function PatientsScreen() {
   const borderColor = isDarkMode ? "#1f2937" : "#ccc";
 
   // ---------- network / config ----------
-  const LOCAL_IP = "192.168.100.134";
+  const LOCAL_IP = "192.168.101.39";
   const API_BASE =
     Platform.OS === "android"
       ? "http://10.0.2.2:3000"

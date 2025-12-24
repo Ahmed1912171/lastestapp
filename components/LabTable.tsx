@@ -27,7 +27,7 @@ const LabTable: React.FC<LabTableProps> = ({ patientId }) => {
     const fetchData = async () => {
       try {
         const { data } = await axios.get(
-          `http:192.168.100.134:3000/patients/${patientId}/lab`
+          `http:192.168.101.39:3000/patients/${patientId}/lab`
         );
 
         if (!data || data.length === 0) {

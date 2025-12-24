@@ -119,7 +119,7 @@ export default function LeavesScreen({ onBack }: LeavesScreenProps) {
 
 
   // ✅ API Configuration
-  const LOCAL_IP = "192.168.100.134";
+  const LOCAL_IP = "192.168.101.39";
   const API_BASE =
     Platform.OS === "android"
       ? "http://10.0.2.2:3000"
